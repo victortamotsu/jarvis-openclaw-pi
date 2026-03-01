@@ -276,9 +276,7 @@ Raspberry Pi    Desktop Windows   Mac Mini
   Channels      (Windows)       (Mac)
 ```
 
----
-
-## 5. Resumo Final
+## 5. Resumo Final - Parte 1 (Docker + Gateway)
 
 | Aspecto | Resposta |
 |---------|----------|
@@ -291,7 +289,132 @@ Raspberry Pi    Desktop Windows   Mac Mini
 
 ---
 
-## 6. Próximos Passos
+## 6. GitHub Copilot como Modelo de IA no OpenClaw
+
+### Resposta: ✅ SIM, É Suportado!
+
+OpenClaw **suporta nativamente** GitHub Copilot como modelo de IA.
+
+### Configuração GitHub Copilot
+
+#### Provider
+- **ID**: `github-copilot`
+- **Autenticação**: `COPILOT_GITHUB_TOKEN` / `GH_TOKEN` / `GITHUB_TOKEN`
+
+#### Setup Rápido
+
+```bash
+# Passo 1: Autenticar com GitHub
+# Certifique-se de que você tem um token GitHub com acesso a Copilot
+export GITHUB_TOKEN="your-github-token"
+
+# Passo 2: Configurar como modelo padrão
+openclaw onboard --auth-choice github  # Se disponível na wizard
+
+# Ou editar a configuração manualmente
+```
+
+#### Configuração Manual (`~/.openclaw/openclaw.json`)
+
+```json
+{
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "github-copilot/copilot"
+      }
+    }
+  },
+  "env": {
+    "GITHUB_TOKEN": "${COPILOT_GITHUB_TOKEN}"
+  }
+}
+```
+
+#### Via CLI
+
+```bash
+# Listar modelos disponíveis
+openclaw models list
+
+# Definir como modelo padrão
+openclaw models set github-copilot/copilot
+
+# Verificar status
+openclaw models status
+```
+
+### Alternativas: Outros Modelos Suportados
+
+Se GitHub Copilot não atender, OpenClaw suporta **+50 provedores**:
+
+| Provedor | Recomendação | Custo |
+|----------|--------------|-------|
+| **Anthropic (Claude)** | ⭐⭐⭐ Melhor longo-contexto | Pago |
+| **OpenAI (GPT-5.2, Codex)** | ⭐⭐⭐ Bom para coding | Pago |
+| **OpenRouter** | ⭐⭐ Múltiplos modelos | Varia |
+| **Ollama** | ⭐⭐⭐ Local (Pi-friendly!) | Grátis |
+| **Groq** | ⭐⭐⭐ Rápido | Pago |
+| **Mistral** | ⭐⭐ Boa relação custo-benefício | Pago |
+| **Google Gemini** | ⭐⭐ Bom multimodal | Pago |
+| **Cerebras** | ⭐⭐ Rápido | Pago |
+| **xAI (Grok)** | ⭐ Novo | Pago |
+
+### Usando Ollama no Raspberry Pi (Alternativa Local)
+
+Se quiser **0 custos** e rodar tudo local:
+
+```bash
+# 1. Instalar Ollama
+curl https://ollama.ai/install.sh | sh
+
+# 2. Baixar modelo leve
+ollama pull llama2:7b  # ~4GB, roda em Pi 4
+
+# 3. Configurar OpenClaw
+openclaw models set ollama/llama2
+```
+
+Arquivo config:
+```json
+{
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "ollama/llama2"
+      }
+    }
+  }
+}
+```
+
+### Comparação: GitHub Copilot vs Alternativas para Raspberry Pi
+
+| Aspecto | GitHub Copilot | Anthropic | Ollama Local |
+|---------|---|---|---|
+| **Custo** | Pago (Pro) | Pago | Grátis |
+| **Internet** | ✅ Requer | ✅ Requer | ❌ Nunca |
+| **Latência** | ~500ms | ~200ms | <100ms |
+| **Qualidade Coding** | ⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐ |
+| **RAM Pi** | N/A | N/A | ~3GB mín |
+| **Setup** | Simples | Simples | Moderado |
+
+### Recomendações para Seu Setup (Raspberry Pi)
+
+1. **Se quer usar cloud + custo baixo**: 
+   - GitHub Copilot Pro (recomendado) ✅
+   - Ou Groq API (muito rápido)
+
+2. **Se quer máxima privacidade + sem custos**:
+   - Ollama local (llama2 ou mistral) com Pi 4+
+
+3. **Se quer melhor qualidade (sem orçamento)**:
+   - Anthropic Claude Opus com Raspberry Pi
+   - (mais lento para processing, mas outputs melhores)
+
+---
+
+## 7. Próximos Passos
 
 1. **Setup Raspberry Pi**:
    - Instalar Node.js 22+
@@ -312,8 +435,24 @@ Raspberry Pi    Desktop Windows   Mac Mini
    openclaw nodes run --node "Windows" -- echo "Hello from Pi"
    ```
 
+## 8. Resumo Final - GitHub Copilot no Raspberry Pi
+
+| Pergunta | Resposta |
+|---------|----------|
+| **GitHub Copilot é suportado?** | ✅ Sim, provider `github-copilot` |
+| **Como configurar?** | Defina `GITHUB_TOKEN` e configure em `openclaw.json` |
+| **Custa mais algo?** | ❌ Só o que você já paga no Copilot Pro |
+| **Funciona no Raspberry Pi?** | ✅ Sim (requer internet, não usa recursos locais) |
+| **Alternativas gratuitas?** | ✅ Ollama local (llama2, mistral) |
+| **Melhor escolha?** | Depende de orçamento e privacidade (ver tabela acima) |
+
+---
+
 ## Referências Documentação
 
+- Model Providers: https://docs.openclaw.ai/concepts/model-providers
+- GitHub Copilot Setup: https://docs.openclaw.ai/providers/models (Built-in providers > GitHub Copilot)
+- Ollama Setup: https://docs.openclaw.ai/providers/ollama
 - Gateway: https://docs.openclaw.ai/gateway
 - Docker: https://docs.openclaw.ai/install/docker
 - Nodes: https://docs.openclaw.ai/nodes
