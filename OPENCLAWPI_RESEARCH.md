@@ -1013,6 +1013,180 @@ Além de skills, há **MCPs especializados** para busca de voos com suporte mcpo
 
 ---
 
+## 12. Gmail, WhatsApp & Google Keep - Email, Chat & Notes Management
+
+### Visão Geral
+
+Para um projeto que necessite **ler emails (Gmail)**, **ler mensagens (WhatsApp)** e **gerenciar notas em kanban (Google Keep)**, OpenClaw oferece opções prontas via skills. A melhor abordagem é usar **skills integradas** que cobrem todas três necessidades.
+
+### 📧 Gmail - Email Reading & Management
+
+#### Opção 1: **Gmail** (⭐ 18.8k - RECOMENDADO)
+- **Creator**: @byungkyu
+- **Funcionalidades**:
+  - ✅ Read emails com OAuth gerenciado
+  - ✅ Send e manage emails
+  - ✅ Manage threads, labels, drafts
+  - ✅ Search and filter
+- **Setup**: Simples - apenas OAuth
+- **Link**: https://clawhub.ai/byungkyu/gmail
+
+**Uso típico**:
+```
+Agent: "Leia meus emails não lidos"
+→ Gmail skill retorna lista de emails
+→ Agent sumaria e responde
+```
+
+#### Opção 2: **Email Daily Summary** (⭐ 6.4k)
+- **Funcionalidades**: Auto-gera summaries diários
+- **Quando usar**: Se só precisa de resumos
+- **Link**: https://clawhub.ai/10e9928a/email-daily-summary
+
+#### Opção 3: **Gog** (⭐ 74.6k - BETTER OPTION)
+- **Creator**: @steipete
+- **Funcionalidades** - Tudo em um:
+  - ✅ **Gmail** (read/send/manage)
+  - ✅ **Google Keep** (create/read/manage notes)
+  - ✅ Google Calendar
+  - ✅ Google Drive
+  - ✅ Google Contacts
+  - ✅ Google Sheets & Docs
+- **Setup**: CLI simples
+- **Link**: https://clawhub.ai/steipete/gog
+
+**Por que Gog é melhor**: Uma skill única cobre Gmail + Keep, economiza instalações
+
+---
+
+### 💬 WhatsApp - Message Reading & Management
+
+#### Opção 1: **WhatsApp Business** (⭐ 16.7k - RECOMENDADO)
+- **Creator**: @byungkyu
+- **Funcionalidades**:
+  - ✅ Send messages
+  - ✅ Manage templates
+  - ✅ Handle conversations
+  - ✅ OAuth gerenciado (Meta Cloud API)
+- **Setup**: OAuth via Meta
+- **Link**: https://clawhub.ai/byungkyu/whatsapp-business
+
+**Uso típico**:
+```
+Agent: "Quais são minhas mensagens não lidas?"
+→ WhatsApp skill lista conversas
+→ Agent resume e responde
+```
+
+#### Opção 2: **WhatsApp Chats** (⭐ 429)
+- **Funcionalidades**: List, search, analyze conversations
+- **Creator**: @MarcosRippel
+- **Link**: https://clawhub.ai/MarcosRippel/whatsapp-chats
+
+#### Opção 3: **OpenClaw WhatsApp** (⭐ 317)
+- **Funcionalidades**: Bridge com QR pairing, auto-reply agents
+- **Mais local**: Não requer Meta Cloud API
+- **Link**: https://clawhub.ai/0xs4m1337/openclaw-whatsapp
+
+---
+
+### 📝 Google Keep - Notes & Kanban (Problema)
+
+**SITUAÇÃO**: Não há skill **específica** para Google Keep em ClawHub.
+
+**SOLUÇÃO RECOMENDADA**: Use **Gog** (↑ já mencionada acima)
+
+#### Setup Gog com Google Keep:
+
+```bash
+# 1. Instalar Gog
+clayhub install gog
+
+# 2. Configurar (first run)
+gog auth
+
+# 3. Usar no agent
+# Criar nota:
+gog keep create "Nova tarefa" "Descrição"
+
+# Listar notas:
+gog keep list
+
+# Editar nota:
+gog keep edit <note-id> "Atualizado"
+```
+
+**Funcionalidades Gog + Keep**:
+- ✅ Create notes
+- ✅ List & search notes
+- ✅ Update & delete notes
+- ✅ Organize em notebooks
+
+**Limitação**: Google Keep não é Kanban nativo (não tem columns), mas pode ser usado como:
+- **Todo List** (status via label: "To Do", "In Progress", "Done")
+- **Simple Notes** (organize por assunto)
+
+---
+
+### 🎯 RECOMENDAÇÃO FINAL PARA SEU PROJETO
+
+**Solução Integrada (BEST)**:
+
+1. **Instalar Gog** (74.6k ⭐)
+   ```bash
+   clayhub install gog
+   ```
+   - Cobre: Gmail (read/write) + Google Keep (notes)
+   - Setup: ~2 minutos com OAuth
+   - Bônus: Calendar, Drive, Contacts, Sheets, Docs
+
+2. **Instalar WhatsApp Business** (16.7k ⭐)
+   ```bash
+   clayhub install whatsapp-business
+   ```
+   - Cobre: WhatsApp (read/write messages)
+   - Setup: ~5 minutos com Meta API key
+
+3. **Usar via Agent**:
+   ```
+   /agent "Leia meus emails e notifique via WhatsApp"
+   /agent "Crie uma nota no Keep: '...' com prioridade alta"
+   /agent "Que mensagens não lidas tenho no WhatsApp?"
+   ```
+
+### ⚠️ Alternativa se Kanban for Crítico
+
+Se realmente precisa de **Kanban estruturado** (columns, drag-drop), considere:
+
+1. **Notion** + skill: https://clawhub.ai/ (search "notion")
+2. **Trello** + skill: https://clawhub.ai/lioarce01/trello-mcp-server
+3. **Linear** (issues como cards): https://clawhub.ai/tacticlaunch/mcp-linear
+
+Mas para MVP, **Google Keep via Gog** é suficiente.
+
+---
+
+### 📊 Comparação Rápida
+
+| Serviço | Skill | Popularidade | Setup | Funcionalidade |
+|---------|-------|---|---|---|
+| **Gmail** | Gmail | ⭐⭐⭐ (18.8k) | Fácil | Read/Send/Manage |
+| **Gmail** | Gog | ⭐⭐⭐⭐⭐ (74.6k) | Fácil | + Keep + Calendar + Drive |
+| **WhatsApp** | WhatsApp Business | ⭐⭐⭐ (16.7k) | Médio (Meta API) | Send/Receive/Templates |
+| **Google Keep** | Gog | ⭐⭐⭐⭐⭐ (74.6k) | Fácil | Create/Read/Update/Delete |
+| **Kanban** | Notion/Trello | ⭐⭐ (varies) | Médio | Full Kanban Features |
+
+---
+
+### 🔗 Próximos Passos
+
+1. **Instalar Gog**: `clayhub install gog` + OAuth
+2. **Configurar WhatsApp**: Obter Meta Cloud API key
+3. **Testar Agent**: Criar queries que usem ambas skills
+4. **Se Kanban crítico**: Migrar para Notion ou Trello conforme necessário
+
+---
+
 ## Referências Documentação
 
 - ClawHub: https://clawhub.ai/
