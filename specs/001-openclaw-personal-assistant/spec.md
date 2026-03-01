@@ -200,35 +200,51 @@ Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando
 **GAP-4: Parsing de PDF de faturas em ARM**
 - **Impacto**: Skill 2 depende de extrair dados de PDFs de faturas bancárias
 - **Risco**: OCR/parsing de PDF é CPU-intensivo e pode ser lento no Pi
-- **Mitigação proposta**: 
-  - Fase 1: Usar apenas CSV (que já é exportável do banco)
-  - Fase 2: PDF parsing via pdfplumber (Python) direto no Pi (primeiro tentar no Pi)
-  - Fase 3: Se comprovadamente impossível no Pi, delegar para Desktop Windows como último recurso
+- **Solução implementada**: Usar **@sylphx/pdf-reader-mcp** (MCP server para PDF processing)
+  - ✅ 5-10x mais rápido com parallel processing
+  - ✅ Extrai texto, imagens, metadados
+  - ✅ Y-coordinate based ordering preserva layout natural
+  - ✅ 94%+ test coverage, production-ready
+  - ✅ Suporta batch processing de múltiplos PDFs
+- **Status**: 🟢 **RESOLVIDO** — pdf-reader-mcp é adequado para ARM/Pi
+- **Pipeline**: PDF → pdf-reader-mcp (extrai texto + titular) → dados enriquecidos para CSV
 
 **GAP-5: Scheduling/cron para checagens periódicas**
 - **Impacto**: Agente precisa verificar canais a cada 15 min, criar relatórios mensais, etc.
-- **Risco**: OpenClaw não tem scheduling nativo
-- **Mitigação proposta**: 
-  - Usar **cron do Linux** (host) que executa `openclaw agent --message "checar canais"` via CLI
-  - Ou container com cron que faz HTTP requests para o Gateway
+- **Pesquisa realizada**: Documentação do OpenClaw NÃO menciona scheduling nativo
+- **Solução**: Usar **cron do Linux/Pi host** que executa `openclaw agent --message "..."` via CLI
+  - Cron executa scripts shell periodicamente
+  - Scripts chamam OpenClaw agent com prompts específicos
   - Manter simples (Constituição Art. VII)
+- **Implementação**: Ver seção "3. Contrato de Scheduling" em `contracts/interfaces.md`
+- **Status**: 🟡 **HOST-BASED** — OpenClaw não tem scheduling nativo, usar cron do sistema
 
 **GAP-6: Memória persistente entre sessões do agente**
 - **Impacto**: Agente precisa lembrar parâmetros de viagem, cotas de gastos, preferências
-- **Risco**: Cada invocação do agente pode perder contexto
-- **Mitigação proposta**: 
-  - Instalar skill **Ontology** (206 ⭐) para knowledge graph persistente
-  - Ou **Self-improving-agent** (939 ⭐) para aprendizado incremental
-  - Dados críticos salvos em arquivo JSON no disco externo (fallback simples)
-  - OpenClaw memory features nativos (se disponíveis na versão)
+- **Pesquisa realizada**: OpenClaw nativo oferece:
+  - ✅ Session store: `~/.openclaw/agents/<agentId>/sessions` (chat history persistente)
+  - ✅ Agent workspace com `SOUL.md`, `AGENTS.md`, `USER.md` (contexto/personalidade)
+  - ✅ Per-agent file system (para armazenar JSON com dados estruturados)
+  - ❌ NÃO há knowledge graph nativo (skill Ontology ofereceria isso)
+- **Solução**: Usar combinação de:
+  1. **Workspace files** (SOUL.md): instrções de memória longa
+  2. **JSON persistente** no disco externo: dados estruturados (preferências, regras, histórico)
+  3. **AgentMemory skill** (se disponível) ou implementar wrapper JSON simples
+- **Status**: 🟡 **PARCIALMENTE NATIVO** — Session store existe, mas dados estruturados precisam de arquivo JSON customizado
 
 **GAP-7: Identificação de titular em transações de cartão**
-- **Impacto**: Faturas de cartão adicional listam todas as transações juntas
-- **Risco**: Sem dados explícitos, agente não consegue atribuir gastos
-- **Mitigação proposta**: 
+- **Impacto**: Faturas de cartão adicional listam todas as transações juntas sem identificar quem gastou
+- **Contexto**: CSV do banco não inclui titular (Data, Estabelecimento, Valor apenas). PDF da fatura tem titular explícito.
+- **Solução**: **Enriquecer CSV com dados do PDF**
+  1. PDF parsing via pdf-reader-mcp extrai: data + estabelecimento + valor + **titular**
+  2. Script/IA compara e faz merge: CSV + dados PDF extraído
+  3. CSV enriquecido inclui coluna de titular
+  4. Firefly III importa com titular pré-identificado
+- **Processo**: 
   - Regras por estabelecimento (ex.: "loja X é sempre filho 1")
   - Pergunta ao usuário para transações ambíguas
-  - Aprendizado incremental: uma vez classificado, lembrar para futuro
+  - Aprendizado incremental: uma vez classificado, salvar regra em JSON persistente
+- **Status**: 🟡 **IMPLEMENTÁVEL** — Requer script de fusion PDF+CSV, mas dados estão disponíveis
 
 ### 🟢 OPORTUNIDADES DE MELHORIA
 
@@ -262,6 +278,7 @@ Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando
 - Email: relatórios semanais e mensais detalhados
 - Google Tasks: tracking de pendências de longa duração
 - Cada canal tem propósito claro
+- **Incluído no MVP** (Fase 1-2) — definição do padrão de notificação é crítica desde o início
 
 ---
 
@@ -281,15 +298,21 @@ Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando
 - Leitura passiva de mensagens do WhatsApp
 - Criação de tasks no Google Tasks
 - Classificação básica (urgente vs normal)
-- Alertas via Telegram
-- Validação: email real → task criada → alerta recebido no Telegram
+- **Alertas diferenciados via Telegram** (OPP-5 implementado):
+  - INFORMATIVO: resumo diário (max 5/hora)
+  - AÇÃO NECESSÁRIA: alerta direto (max 10/hora)
+  - URGENTE/CRÍTICO: imediato, sem limite
+- Validação: email real → task criada → alerta recebido no Telegram com criticidade apropriada
 
 ### Fase 2 — Gestor Financeiro MVP (Semana 4-5)
 - Configurar MCP Firefly III (ou API REST)
-- Pipeline de importação CSV → Firefly
+- Pipeline de importação CSV + enriquecimento de titular via PDF parsing (pdf-reader-mcp)
 - Relatório mensal básico de gastos
 - Consultas em linguagem natural via Telegram
-- Validação: importar extrato real → consultar gasto via Telegram
+- **Notificações diferenciadas** (OPP-5):
+  - Telegram: alertas de cota (80% e 100%) até atingir limite
+  - Email: relatório consolidado no dia 5 de cada mês
+- Validação: importar extrato real → CSV enriquecido com titular do PDF → consultar gasto via Telegram
 
 ### Fase 3 — Ajudante de Viagens MVP (Semana 6-7)
 - Configurar skill de busca de voos
