@@ -881,6 +881,138 @@ Agent: "Você gastou R$ X com alimentos este mês"
 
 ---
 
+## 11. Google Flights - Skills & MCPs para Pesquisa de Voos
+
+### Visão Geral
+
+OpenClaw possui **múltiplas opções** para integrar busca de voos via Google Flights sem necessidade de implementação customizada. Há tanto **skills simples** quanto **MCPs avançados** disponíveis em ClawHub.
+
+### 📌 Skills para Google Flights (Recomendado para Start Rápido)
+
+#### 1. **Flight Search** (⭐ 2.5k - MAIS POPULAR)
+- **Creator**: @awlevin
+- **Recurso principal**: Busca Google Flights sem API key
+- **Funcionalidades**:
+  - Preços, horários, companhias aéreas
+  - Filtragem fácil
+  - Ideal para consultas rápidas
+- **Quando usar**: Quando você quer o mínimo de setup e máxima compatibilidade
+- **Link**: https://clawhub.ai/awlevin/flight-search
+
+#### 2. **Flights** (⭐ 1.8k)
+- **Creator**: @BrennerSpear
+- **Diferencial**: Controle avançado
+  - Voos diretos e com conexão
+  - Filtros por horário e classe de cabine
+  - Links para booking direto
+- **Quando usar**: Quando precisa de filtragem sofisticada
+- **Link**: https://clawhub.ai/BrennerSpear/flights-search
+
+#### 3. **Google Flights** (⭐ 377)
+- **Creator**: @kris-hansen
+- **Recurso**: Busca direta Google Flights
+- **Status**: Versão original mais simples
+- **Link**: https://clawhub.ai/kris-hansen/google-flights
+
+#### 4. **SerpApi Flights** (⭐ 116)
+- **Creator**: @kirorab
+- **Diferencial**: Via integração SerpApi
+  - Horários, preços, classes de cabine
+  - Mais confiável em casos de bloqueios
+- **Quando usar**: Se Google detectar scraping
+- **Link**: https://clawhub.ai/kirorab/serpapi-flights
+
+### 🚀 MCPs para Viagens (Integração Avançada)
+
+Além de skills, há **MCPs especializados** para busca de voos com suporte mcporter:
+
+#### 1. **Jinko Flight Search MCP** (⭐ 1.6k)
+- **Funcionalidades**:
+  - Busca de voos
+  - Descoberta automática de destinos (se você não sabe pra onde ir)
+  - Suporte a filtros: data, classe de cabine, orçamento
+- **Setup**:
+  ```bash
+  # Configurar no mcporter.json:
+  {
+    "servers": [
+      {
+        "name": "jinko",
+        "type": "http",
+        "url": "https://mcp.gojinko.com"
+      }
+    ]
+  }
+  ```
+- **Uso**:
+  ```
+  mcporter list jinko --schema
+  mcporter call jinko.search_flights departure=NYC arrival=LAX date=2026-03-15
+  ```
+- **Link**: https://clawhub.ai/kevinjinko/jinko-flight-search
+
+#### 2. **VariFlight MCP**
+- **Funcionalidades**: Informações de voos, previsões, tarifas mais baixas
+- **Dados**: Aviação em tempo real
+- **Quando usar**: Análise de padrões de preços
+
+#### 3. **Amadeus MCP**
+- **Funcionalidades**: Flight Offers Search API
+- **Quando usar**: Busca corporativa com múltiplas opções
+
+#### 4. **Aviationstack MCP**
+- **Funcionalidades**: Dados de aviação em tempo real
+  - Status de voos
+  - Rotas
+  - Histórico
+
+### ✅ RECOMENDAÇÃO
+
+**para OpenClaw no Raspberry Pi**:
+
+1. **Start Rápido**: Use a skill **"Flight Search"** by @awlevin
+   ```bash
+   clayhub install flight-search
+   ```
+   - Não requer API key
+   - Funciona imediatamente
+   - Setup: ~30 segundos
+   - Suporta: preços, horários, booking links
+
+2. **Se Precisar de MCPs**: Configure **Jinko via mcporter**
+   ```bash
+   # Adicionar ao mcporter.json
+   {
+     "name": "jinko",
+     "type": "http",
+     "url": "https://mcp.gojinko.com"
+   }
+   ```
+   - Oferece tanto busca quanto descoberta de destinos
+   - Ideal para planejamento completo de viagens
+
+3. **Fallback**: Se Google bloquear scraping, use **SerpApi Flights**
+   - Requer SerpApi API key (gratuita até certo volume)
+   - Mais confiável em longo prazo
+
+### 📊 Comparação Quick
+
+| Skill/MCP | Setup | Funcionalidade | Popularidade | API Key? |
+|-----------|-------|---|---|---|
+| Flight Search | Muito fácil | Básico | ⭐⭐⭐ (2.5k) | Não |
+| Jinko MCP | Fácil | Avançado + Discovery | ⭐ (1.6k) | Sim |
+| SerpApi | Médio | Robusto | ⭐ (116) | Sim |
+| Flights (BrennerSpear) | Fácil | Avançado | ⭐⭐ (1.8k) | Não |
+
+### 🔗 Próximos Passos
+
+1. **Instalar e testar**: Flight Search skill localmente
+2. **Se necessário configurar MCP**: Adicionar Jinko ao mcporter.json
+3. **Integrar com agent**: Usar /agent para testar queries de voos
+4. **Monitorar**: Verificar se Google bloqueia scraping (adaptar para SerpApi se necessário)
+
+---
+
 ## Referências Documentação
 
 - ClawHub: https://clawhub.ai/
