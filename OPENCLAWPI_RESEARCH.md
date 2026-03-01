@@ -649,6 +649,238 @@ Uma vez instalada, a skill é automaticamente detectada. Você pode customizar e
 
 ---
 
+## 10. 🎯 Integração MCP (Model Context Protocol) com OpenClaw
+
+### ✅ SIM: OpenClaw Suporta MCPs!
+
+OpenClaw **SIM** suporta integração com servidores MCP (Model Context Protocol) através do skill bundled `mcporter`. Isso permite usar qualquer MCP da comunidade, incluindo Firefly III.
+
+### Como Funciona: `mcporter` Skill
+
+O `mcporter` é um skill nativo do OpenClaw que atua como cliente MCP universal:
+
+**Instalação**:
+```bash
+# Já está incluído no OpenClaw
+# Para atualizar mcporter CLI (opcional):
+npm install -g mcporter
+```
+
+**Comandos Básicos**:
+```bash
+# Listar todos os servidores MCP configurados
+mcporter list
+
+# Ver tools disponíveis de um MCP
+mcporter list <server> --schema
+
+# Chamar um tool específico
+mcporter call <server.tool> key=value
+```
+
+**Exemplos de Sintaxe**:
+```bash
+# Seletor simples
+mcporter call linear.list_issues team=ENG limit:5
+
+# Sintaxe de função
+mcporter call "firefly.create_transaction(amount: 100, type: 'expense')"
+
+# URL (HTTP MCP)
+mcporter call https://api.example.com/mcp.fetch url:https://example.com
+
+# Stdio (MCP servidor local)
+mcporter call --stdio "bun run ./server.ts" scrape url=https://example.com
+
+# JSON payload
+mcporter call <server.tool> --args '{"limit":5}'
+```
+
+### Configuração de MCP Servers
+
+**Arquivo Config**: `./config/mcporter.json` ou `~/.openclaw/workspace/config/mcporter.json`
+
+**Estrutura Típica**:
+```json
+{
+  "servers": [
+    {
+      "name": "firefly-iii",
+      "type": "stdio",
+      "command": "node",
+      "args": ["/path/to/firefly-iii-mcp/server.js"],
+      "env": {
+        "FIREFLY_API_URL": "https://firefly.example.com",
+        "FIREFLY_API_KEY": "your-api-key"
+      }
+    },
+    {
+      "name": "linear",
+      "type": "http",
+      "url": "https://api.linear.app/mcp",
+      "auth": { "type": "bearer", "token": "your-token" }
+    }
+  ]
+}
+```
+
+### 🔥 Integração Firefly III MCP
+
+#### Opção 1: Usar MCP Server Firefly III Existente (Recomendado)
+
+1. **Encontrar MCP Firefly III**:
+   - Procure em https://github.com com `firefly-iii-mcp`
+   - Ou use: https://github.com (search for "firefly mcp")
+
+2. **Instalar Servidor MCP**:
+   ```bash
+   git clone https://github.com/seu-user/firefly-iii-mcp.git
+   cd firefly-iii-mcp
+   npm install
+   ```
+
+3. **Configurar em mcporter.json**:
+   ```json
+   {
+     "servers": [
+       {
+         "name": "firefly-iii",
+         "type": "stdio",
+         "command": "node",
+         "args": ["/path/to/firefly-iii-mcp/index.js"],
+         "env": {
+           "FIREFLY_API_URL": "https://seu-firefly.com",
+           "FIREFLY_API_KEY": "sua-api-key"
+         }
+       }
+     ]
+   }
+   ```
+
+4. **Testar no Agent**:
+   ```
+   /agent "Quantas transações de expenses temos este mês?"
+   
+   → Agent usa tool: mcporter.firefly-iii.list_transactions
+   → Retorna dados financeiros do Firefly III
+   ```
+
+#### Opção 2: Usar `api-gateway` Skill (Fallback)
+
+Se não encontrar MCP Firefly III, use o skill `api-gateway` para chamar a API rest:
+
+```bash
+clayhub install api-gateway
+```
+
+**Configurar**:
+```json
+{
+  "skills": {
+    "entries": {
+      "api-gateway": {
+        "enabled": true,
+        "env": {
+          "FIREFLY_API_BASE": "https://seu-firefly.com/api/v1",
+          "FIREFLY_API_KEY": "sua-api-key"
+        }
+      }
+    }
+  }
+}
+```
+
+### Vantagens de Usar MCP vs Skills
+
+| Aspecto | MCP (`mcporter`) | Skills |
+|--------|------------------|--------|
+| **Setup** | Config JSON simples | Instalar via clayhub |
+| **Reutilização** | Mesmo MCP em múltiplas ferramentas | OpenClaw-específico |
+| **Comunidade** | Grande ecossistema MCP | Comunidade OpenClaw |
+| **Type Safety** | Schema JSON automático | Manual |
+| **Manutenção** | Upstream updates | Sync manual |
+
+### ✨ MCPs Disponíveis em ClawHub
+
+OpenClaw tem múltiplas skills que envolvem MCP integration:
+
+1. **openclaw-mcp-plugin** (3.8k ⭐):
+   - "Use Model Context Protocol servers to access external tools and data sources"
+   - Descobre e executa tools de MCPs configurados
+   - Por @lunarpulse
+
+2. **mcp-skill** (3.7k ⭐):
+   - Web search, advanced search, code context, crawling via MCP
+   - Por @simlocker
+
+3. **mcp-adapter** (3.1k ⭐):
+   - Similar ao openclaw-mcp-plugin
+   - Wrapper para MCPs genéricos
+   - Por @lunarpulse
+
+4. **Specialized MCPs**:
+   - playwright-mcp: Browser automation via Playwright (11.7k ⭐)
+   - Home Assistant (mcp-hass): Smart home control (1.7k ⭐)
+   - GitHub MCP: Gerenciar repos, PRs, issues
+   - Atlassian MCP: Jira, Confluence
+   - ClickUp MCP: Task management
+
+### ⚙️ Auth + Config Avançado
+
+```bash
+# OAuth automatic setup
+mcporter auth firefly-iii --reset
+
+# Ver configurações
+mcporter config list
+
+# Adicionar novo server via CLI
+mcporter config add firefly-iii
+
+# Login/logout para OAuth servers
+mcporter config login firefly-iii
+mcporter config logout firefly-iii
+
+# Importar configuração de arquivo
+mcporter config import ./my-servers.json
+```
+
+### 🚀 Workflow Típico: Agent + Firefly III MCP
+
+```
+User: "Qual foi meu gasto com alimentos este mês?"
+   ↓
+Agent: Reconhece pergunta financeira
+   ↓
+Agent: Chama: mcporter list firefly-iii --schema
+   ↓
+Agent descobre tools: [list_transactions, create_transaction, get_category, ...]
+   ↓
+Agent: mcporter call firefly-iii.list_transactions category=Food month=current
+   ↓
+Firefly III MCP: Retorna todas as transações
+   ↓
+Agent: "Você gastou R$ X com alimentos este mês"
+```
+
+### Limitações & Notas
+
+- ⚠️ MCPs stdio requerem que o servidor esteja sempre rodando
+- ⚠️ MCPs HTTP devem estar expostos (use Tailscale se remoto)
+- ℹ️ Configure `--config` path se não usar default
+- ℹ️ Prefira `--output json` para resultados machine-readable
+- ✅ Type generation disponível: `mcporter emit-ts <server>`
+- ✅ CLI generation: `mcporter generate-cli --server firefly-iii`
+
+### Recursos Adicionais
+
+- mcporter Docs: http://mcporter.dev
+- MCP Spec: https://modelcontextprotocol.io/
+- MCP Servers: https://github.com/modelcontextprotocol/servers
+- Firefly III: https://www.firefly-iii.org/
+
+---
+
 ## Referências Documentação
 
 - ClawHub: https://clawhub.ai/
