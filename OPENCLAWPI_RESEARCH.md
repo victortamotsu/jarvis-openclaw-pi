@@ -448,8 +448,212 @@ Arquivo config:
 
 ---
 
+---
+
+## 9. O que é ClawHub?
+
+### Resumo
+**ClawHub** é o **registro público de skills (habilidades)** para OpenClaw - um marketplace de extensões que permitem estender a capacidade do agente IA com novas funcionalidades prontas para usar.
+
+### Endereço
+- 🌐 **Website**: https://clawhub.ai/
+- 📦 **Repositório**: https://github.com/openclaw/clawhub
+
+### O que você encontra no ClawHub
+
+| Tipo | Exemplos | Uso |
+|------|----------|-----|
+| **Integrações** | Trello, Slack, Google Workspace, GitHub | Conectar com serviços externos |
+| **Utilidades** | Weather, Summarize, Web Search (Tavily) | Funcionalidades gerais |
+| **Conhecimento** | Answer Overflow, Ontology | Gerenciar memória e contexto |
+| **Automação** | Self-improving-agent, Proactive-agent | Padrões de automação avançada |
+| **Controle de Hardware** | Sonos, Calendarios (CalDAV) | IoT e dispositivos |
+
+### Skills Populares (Estatísticas Atuais)
+
+1. **Self-improving-agent** ⭐ 939 - Captura erros e aprende com correções
+2. **Ontology** ⭐ 206 - Grafo tipado de conhecimento para memória estruturada
+3. **Gog** ⭐ 586 - Google Workspace CLI (Gmail, Sheets, Docs, etc)
+4. **Tavily Search** ⭐ 311 - Busca web otimizada para IA
+5. **Trello** ⭐ 82 - Gerenciar quadros, listas e cards
+6. **Slack** ⭐ 75 - Controlar Slack completamente
+
+### Como Instalar Skills
+
+#### 1️⃣ Instalação Rápida (Uma linha)
+
+```bash
+# Instalar uma skill específica
+npx clawhub@latest install sonoscli
+
+# Ou com outros package managers
+pnpm clawhub@latest install slack
+bun clawhub@latest install tavily-search
+```
+
+#### 2️⃣ Atualizar Skills Instaladas
+
+```bash
+# Atualizar todas as skills
+clawhub update --all
+
+# Sincronizar (scan + publicar atualizações)
+clawhub sync --all
+```
+
+#### 3️⃣ Onde as Skills Vão
+
+Por padrão, skills são instaladas em:
+- `./skills/` (no diretório atual)
+- Ou na pasta do workspace configurado do OpenClaw
+
+**Localização final:**
+```
+~/.openclaw/workspace/skills/<skill-name>/SKILL.md
+```
+
+### Estrutura de uma Skill
+
+Cada skill é uma pasta com `SKILL.md`:
+
+```markdown
+---
+name: my-awesome-skill
+description: Descrição breve do que faz
+metadata: {
+  "openclaw": {
+    "requires": { "env": ["API_KEY"] },
+    "primaryEnv": "API_KEY"
+  }
+}
+---
+
+## Instruções para o Agent
+
+Como usar a skill...
+```
+
+### Configuração no OpenClaw
+
+Uma vez instalada, a skill é automaticamente detectada. Você pode customizar em `~/.openclaw/openclaw.json`:
+
+```json
+{
+  "skills": {
+    "entries": {
+      "slack": {
+        "enabled": true,
+        "apiKey": {
+          "source": "env",
+          "provider": "default",
+          "id": "SLACK_BOT_TOKEN"
+        }
+      },
+      "trello": {
+        "enabled": true,
+        "env": {
+          "TRELLO_KEY": "seu-key-aqui",
+          "TRELLO_TOKEN": "seu-token"
+        }
+      }
+    }
+  }
+}
+```
+
+### Skills no Raspberry Pi
+
+✅ **Compatível**: O ClawHub funciona normalmente no Raspberry Pi
+
+**Recomendações:**
+- Use skills que **não requerem compilação pesada**
+- Evite skills com **dependências de binários complexos** em ARM
+- **Skills nativas JavaScript** funcionam melhor (exemplos: Slack, Tavily, GitHub)
+
+### Security Notes
+
+⚠️ **Importante - Trate skills como código não confiável:**
+
+```bash
+# Antes de usar uma skill, SEMPRE verifique:
+1. Código da skill no repositório
+2. Permissões solicitadas
+3. Dependências externas
+4. Reviews/estrelas da comunidade
+```
+
+**Usar em sandbox para skills untrusted:**
+```json
+{
+  "agents": {
+    "defaults": {
+      "sandbox": {
+        "mode": "non-main"  // Roda skills em container isolado
+      }
+    }
+  }
+}
+```
+
+### Procurar Skills
+
+**Opções:**
+
+1. **Website**: Acesse https://claalhub.ai/skills
+2. **CLI**: 
+   ```bash
+   openclaw models list  # Listar skills instaladas
+   ```
+3. **No Chat**: Use o skill `find-skills`
+   ```
+   /find-skills <funcionalidade desejada>
+   ```
+   (O agente vai procurar no ClawHub automaticamente)
+
+### Criar e Publicar Sua Skill
+
+**Passos:**
+
+1. Criar pasta com `SKILL.md`
+2. Publicar em um repositório GitHub
+3. Ir para https://clawhub.ai/upload
+4. Fazer login com GitHub
+5. Fazer upload da skill
+
+**Exemplo:** Muitos usuários criaram skills customizadas e as compartilham!
+
+### Diferença: Skills vs Plugins vs Tools
+
+| Aspecto | Skills | Plugins | Tools |
+|---------|--------|---------|-------|
+| **O que é** | Instruções para agent | Extensões do core | Funções do gateway |
+| **Quem cria** | Comunidade/usuários | Devs | Core OpenClaw |
+| **Instalação** | Via `clawhub install` | Via plugin registry | Nativo |
+| **Escopo** | Sistema prompt | Funcionalidade core | RPC gateway |
+
+### Workflow Típico
+
+```
+1. User: "Posso integrar com Trello?"
+   ↓
+2. Agent: Chama skill "find-skills"
+   ↓
+3. ClawHub: Retorna "trello" como opção
+   ↓
+4. User: "/find-skills install trello"
+   ↓
+5. Agent instala skill automaticamente
+   ↓
+6. Agora pode usar Trello: "Crie task X no Trello"
+```
+
+---
+
 ## Referências Documentação
 
+- ClawHub: https://clawhub.ai/
+- Skills Doc: https://docs.openclaw.ai/tools/skills
+- ClawHub Full Guide: https://docs.openclaw.ai/tools/clawhub
 - Model Providers: https://docs.openclaw.ai/concepts/model-providers
 - GitHub Copilot Setup: https://docs.openclaw.ai/providers/models (Built-in providers > GitHub Copilot)
 - Ollama Setup: https://docs.openclaw.ai/providers/ollama
