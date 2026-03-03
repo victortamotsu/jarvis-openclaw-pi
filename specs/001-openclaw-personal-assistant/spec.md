@@ -45,7 +45,7 @@ Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando
 
 **Critérios de Aceite — Skill 1**:
 - [ ] Agente lê mensagens do WhatsApp passivamente a cada 15 minutos (leitura, sem envio)
-- [ ] Agente lê emails do Gmail via **Gmail API REST (OAuth 2.0)**, compartilhando infraestrutura OAuth com Tasks e Drive; push notification via Pub/Sub preferível a polling; MCP para Gmail mantido como fallback
+- [ ] Agente lê emails do Gmail via **skill nativa do OpenClaw** (ClawHub); fallback para **Gmail API REST (OAuth 2.0)** se a skill não estiver disponível ou não cobrir a operação necessária
 - [ ] Mensagens de curto prazo (ex.: "ok", "obrigado", "chego em 5 min") são ignoradas
 - [ ] Mensagens que exigem ação de médio/longo prazo criam task no Google Tasks
 - [ ] Tasks possuem: título, notas contextuais, lista de tarefas (task list), sub-tasks de ações, data de vencimento
@@ -356,7 +356,7 @@ Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando
 ### Sessão 2026-03-03
 
 - Q: Integração Firefly III: MCP (mcporter), REST direta ou ambos? → A: **Ambos (C)** — MCP (mcporter) como interface principal do agente (com visão de expansão para outros MCPs futuros); REST API direta como fallback e para pipelines de importação quando o MCP mcporter não cobrir a operação necessária.
-- Q: Integração Gmail: IMAP, Gmail API REST, MCP ou forwarding? → A: **Gmail API REST (OAuth 2.0) como mecanismo principal**, compartilhando a mesma infraestrutura OAuth de Tasks/Drive; MCP para Gmail mantido como plano de contingência se a integração REST apresentar problemas.
+- Q: Integração Gmail: IMAP, Gmail API REST, MCP ou forwarding? → A: **Skill nativa do OpenClaw para Gmail** (ClawHub) como mecanismo principal; se indisponível ou insuficiente, usar **Gmail API REST (OAuth 2.0)** compartilhando a infraestrutura OAuth de Tasks/Drive.
 - Q: Armazenamento de credenciais e tokens OAuth: como e onde? → A: **Arquivo `.env` criptografado** com `git-crypt` ou `sops`; montado como volume nos containers via Docker Compose. Tokens nunca commitados em texto claro.
 - Q: WhatsApp/Baileys: modelo de deployment no Pi? → A: **Skill nativa do OpenClaw** (`openclaw-whatsapp` via ClawHub), sem container Docker separado; economiza RAM e mantém orquestração simples dentro do runtime OpenClaw.
 - Q: Gatilho de importação de PDF/CSV (Skill 2): como o agente sabe que há arquivo novo? → A: **Comando manual via Telegram** — usuário envia `/importar` (ou similar) após salvar o arquivo no Drive; agente busca na pasta configurada e processa. Sem monitoramento assíncrono do Drive.
