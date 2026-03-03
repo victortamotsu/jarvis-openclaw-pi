@@ -45,7 +45,7 @@ Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando
 
 **Critérios de Aceite — Skill 1**:
 - [ ] Agente lê mensagens do WhatsApp passivamente a cada 15 minutos (leitura, sem envio)
-- [ ] Agente lê emails do Gmail a cada 15 minutos (ou via push notification)
+- [ ] Agente lê emails do Gmail via **Gmail API REST (OAuth 2.0)**, compartilhando infraestrutura OAuth com Tasks e Drive; push notification via Pub/Sub preferível a polling; MCP para Gmail mantido como fallback
 - [ ] Mensagens de curto prazo (ex.: "ok", "obrigado", "chego em 5 min") são ignoradas
 - [ ] Mensagens que exigem ação de médio/longo prazo criam task no Google Tasks
 - [ ] Tasks possuem: título, notas contextuais, lista de tarefas (task list), sub-tasks de ações, data de vencimento
@@ -73,7 +73,7 @@ Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando
 **US-2.7**: Como Victor, quero que o agente crie uma pendência mensal no Skill 1 para me lembrar de exportar faturas e extratos, completando o ciclo de importação.
 
 **Critérios de Aceite — Skill 2**:
-- [ ] Pipeline de importação: usuário exporta PDF/CSV → salva no Google Drive → avisa o agente → agente processa
+- [ ] Pipeline de importação: usuário exporta PDF/CSV → salva no Google Drive → envia `/importar` via Telegram → agente busca arquivo na pasta configurada do Drive e processa
 - [ ] CSV importado no Firefly III com categorização automática
 - [ ] PDF de fatura parseado e transações extraídas (com identificação de titular quando possível)
 - [ ] Transações sem titular identificável são marcadas como `[NEEDS CLARIFICATION]` e perguntadas ao usuário
@@ -82,7 +82,7 @@ Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando
 - [ ] Consultas em linguagem natural retornam dados do Firefly III (ex.: "quanto gastei com alimentação em fevereiro?")
 - [ ] Informe de rendimentos pode ser importado para análise consolidada anual
 - [ ] Dados financeiros sensíveis são anonimizados antes de enviar ao GitHub Copilot (mascarar nomes, valores exatos)
-- [ ] Integração com Firefly III via MCP (mcporter) ou API REST direta
+- [ ] Integração com Firefly III via **MCP (mcporter)** para consultas em linguagem natural do agente; **REST API direta** para pipelines de importação e operações não cobertas pelo MCP
 
 ### 3.3 Skill 3 — Ajudante de Viagens
 
@@ -154,7 +154,7 @@ Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando
 
 ### 4.4 Segurança
 - Ver Constituição, Artigo III
-- OAuth tokens criptografados em repouso
+- OAuth tokens e credenciais armazenados em arquivo `.env` criptografado com `git-crypt` ou `sops`; montado como volume nos containers; nunca commitado em texto claro
 - Nenhuma porta exposta à internet pública
 - Dados financeiros anonimizados antes de enviar ao GitHub Copilot
 
@@ -172,7 +172,7 @@ Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando
 
 **GAP-2: ~~WhatsApp Personal vs Business API~~ — RESOLVIDO**
 - **Decisão**: **Telegram** é canal principal de interação (API oficial, bots gratuitos, sem risco de ban).
-- **WhatsApp** é mantido como fonte de leitura passiva (input-only) via openclaw-whatsapp/Baileys.
+- **WhatsApp** é mantido como fonte de leitura passiva (input-only) via skill nativa `openclaw-whatsapp` (ClawHub/Baileys), rodando dentro do runtime OpenClaw sem container extra.
 - O agente NUNCA envia mensagens pelo WhatsApp — toda saída é via Telegram.
 - Risco de ban do WhatsApp é minimizado por ser apenas leitura (sem envio de mensagens).
 
@@ -348,6 +348,18 @@ Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando
 7. O volume de mensagens diário é gerenciável (< 200 mensagens/dia entre WhatsApp e email)
 8. As faturas bancárias são do Brasil (formato brasileiro de PDF/CSV)
 9. O Desktop Windows está disponível na mesma rede/Tailscale como último recurso (não como dependência)
+
+---
+
+## 9. Clarificações
+
+### Sessão 2026-03-03
+
+- Q: Integração Firefly III: MCP (mcporter), REST direta ou ambos? → A: **Ambos (C)** — MCP (mcporter) como interface principal do agente (com visão de expansão para outros MCPs futuros); REST API direta como fallback e para pipelines de importação quando o MCP mcporter não cobrir a operação necessária.
+- Q: Integração Gmail: IMAP, Gmail API REST, MCP ou forwarding? → A: **Gmail API REST (OAuth 2.0) como mecanismo principal**, compartilhando a mesma infraestrutura OAuth de Tasks/Drive; MCP para Gmail mantido como plano de contingência se a integração REST apresentar problemas.
+- Q: Armazenamento de credenciais e tokens OAuth: como e onde? → A: **Arquivo `.env` criptografado** com `git-crypt` ou `sops`; montado como volume nos containers via Docker Compose. Tokens nunca commitados em texto claro.
+- Q: WhatsApp/Baileys: modelo de deployment no Pi? → A: **Skill nativa do OpenClaw** (`openclaw-whatsapp` via ClawHub), sem container Docker separado; economiza RAM e mantém orquestração simples dentro do runtime OpenClaw.
+- Q: Gatilho de importação de PDF/CSV (Skill 2): como o agente sabe que há arquivo novo? → A: **Comando manual via Telegram** — usuário envia `/importar` (ou similar) após salvar o arquivo no Drive; agente busca na pasta configurada e processa. Sem monitoramento assíncrono do Drive.
 
 ---
 
