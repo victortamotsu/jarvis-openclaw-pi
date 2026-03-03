@@ -39,7 +39,7 @@ docs/                         → documentação operacional
 **Purpose**: Estrutura do repositório, Docker Compose base, credenciais e workspace do agente.
 
 - [ ] T001 Criar estrutura de diretórios do repositório conforme plan.md: `config/openclaw/agents/jarvis/`, `config/crontabs/`, `skills/google-tasks/`, `skills/firefly-mcp/`, `scripts/`, `pipeline/`, `docs/`
-- [ ] T002 Criar `docker-compose.yml` com serviços base: `firefly-iii` (existente) + `openclaw` (mem_limit: 1g, volume /mnt/external/openclaw) + `scheduler` (Alpine cron, mem_limit: 64m)
+- [ ] T002 Criar `docker-compose.yml` com serviços base: `firefly-iii` (existente) + `openclaw` (mem_limit: 1g, volume /mnt/external/openclaw) + `scheduler` (Alpine cron, mem_limit: 64m); incluir bloco `healthcheck` para cada serviço: `openclaw` (HTTP GET /health a cada 30s, timeout 10s, start_period 60s), `firefly-iii` (HTTP GET / a cada 60s), `scheduler` (cmd test a cada 60s) — Art. VIII.1
 - [ ] T003 [P] Criar `.env.example` com todas as variáveis necessárias: `GITHUB_TOKEN`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `FIREFLY_TOKEN`, `FIREFLY_URL`
 - [ ] T004 [P] Configurar `git-crypt`: adicionar `.gitattributes` com `*.env filter=git-crypt diff=git-crypt`, documentar setup em `docs/runbook.md` (seção "Setup inicial")
 - [ ] T005 Criar `config/openclaw/agents/jarvis/SOUL.md` com personalidade do agente, instruções de comportamento (concisão, throttling, confirmação antes de ações destrutivas), e mapeamento de skills disponíveis
@@ -83,7 +83,9 @@ docs/                         → documentação operacional
 - [ ] T023 [US1] Implementar lógica de deduplicação em `config/openclaw/agents/jarvis/SOUL.md`: instruções para buscar task existente via `list_tasks` (match título + contato, janela 30 dias) antes de criar nova; se encontrar, fazer `update_task` com novo histórico
 - [ ] T024 [US1] Criar `scripts/check-channels.sh`: script bash que dispara `openclaw agent --message "Verificar novos emails e mensagens WhatsApp. Processar pendências conforme instruções." --max-tokens 500`
 - [ ] T025 [US1] Criar `config/crontabs/jarvis` com regras de cron: checagem a cada 15min (`*/15 * * * *`), resumo diário às 22h (`0 22 * * *`), relatório mensal dia 5 às 9h (`0 9 5 * *`)
-- [ ] T026 [US1] Implementar throttling de alertas Telegram em `config/openclaw/agents/jarvis/SOUL.md`: regras INFORMATIVO (max 5/hora, agrupar em digest), AÇÃO_NECESSÁRIA (max 10/hora), URGENTE/CRÍTICO (sem limite; CRÍTICO repete a cada 15min até confirmação)
+- [ ] T026 [US1] Implementar regras de agrupamento de notificações em `config/openclaw/agents/jarvis/SOUL.md`: INFORMATIVO agrupa itens múltiplos no resumo diário das 22h (sem alerta push individual); AÇÃO_NECESSÁRIA envia alerta individual direto; URGENTE/CRÍTICO envia imediatamente (CRÍTICO repete a cada 15min até confirmação explícita via Telegram)
+- [ ] T060 [US1] Implementar handler `/responder <task_id>` em `config/openclaw/agents/jarvis/SOUL.md`: ao receber o comando via Telegram, buscar task via `list_tasks` pelo ID, pesquisar contexto adicional via `tavily-search` se necessário, gerar 2–3 sugestões de resposta formatadas, enviar ao Victor via Telegram para revisão
+- [ ] T061 [US1] Implementar detecção de encerramento automático de task em `config/openclaw/agents/jarvis/SOUL.md`: ao processar mensagem de confirmação ("ok, feito", "resolvido", "confirmado") vinculada a task aberta (match por assunto + contato), chamar `complete_task` via google-tasks MCP e confirmar encerramento via Telegram
 - [ ] T027 [US1] Validação E2E Skill 1: executar cenário completo do Quickstart Fase 1 (email real → task criada → alerta Telegram com urgência correta) e registrar resultado
 
 ---
@@ -104,6 +106,8 @@ docs/                         → documentação operacional
 - [ ] T035 [US2] Implementar persistência e aprendizado de regras de titular: `pipeline/csv_enricher.py` deve salvar regras confirmadas em `/mnt/external/openclaw/memory/owner-rules.json` no formato `{"ESTABELECIMENTO": "member_id"}`; instrução em `SOUL.md` para perguntar titulares ambíguos via Telegram e salvar resposta
 - [ ] T036 [US2] Criar `scripts/monthly-report.sh`: gera relatório de gastos por categoria e por titular do mês anterior via Firefly REST API, formata em Markdown, envia link do Google Drive via Telegram para Victor e email para cônjuge
 - [ ] T037 [US2] Implementar alertas de cota de gastos: instrução em `SOUL.md` para verificar quotas em `/mnt/external/openclaw/memory/quota-rules.json` e alertar via Telegram quando `spent >= 80%` (WARNING) e `>= 100%` (CRÍTICO) da cota mensal por titular
+- [ ] T062 [US2] Implementar handler de consultas sobre investimentos em `config/openclaw/agents/jarvis/SOUL.md`: ao receber pergunta sobre CDB, Tesouro Direto, LCI, LCA, fundos etc., consultar taxas atuais e SELIC via `tavily-search`, formatar análise comparativa por tipo de produto, responder via Telegram; dados de valor nunca enviados ao Copilot sem anonimização (Art. III)
+- [ ] T063 [US2] Criar `pipeline/yield_importer.py`: parseia PDF de informe de rendimentos via `pdf_parser.py`, extrai por produto: instituição, tipo, valor bruto, IR retido; aplica anonimização via `anonymizer.py`; gera relatório consolidado anual em Markdown; salva na pasta `Jarvis/relatorios/` no Google Drive e envia link via Telegram
 - [ ] T038 [US2] Validação E2E Skill 2: executar cenário completo do Quickstart Fase 2 (CSV real + PDF real → `/importar` → Firefly atualizado → consulta NL respondida) e registrar resultado
 
 ---
@@ -146,6 +150,7 @@ docs/                         → documentação operacional
 
 - [ ] T053 [P] Implementar logging estruturado em todos os scripts bash (`scripts/*.sh`): redirecionar stdout/stderr para `/mnt/external/logs/{script-name}/YYYY-MM-DD.log` com timestamps
 - [ ] T054 [P] Criar `config/logrotate.conf` e registrar no `docker-compose.yml` scheduler: rotação semanal, compressão gzip, retenção 90 dias (Art. VI.4 — fecha gap do Constitution Check)
+- [ ] T064 [P] Criar `scripts/health-check.sh`: verificar via `docker ps --filter name=openclaw --filter name=firefly --filter name=scheduler` se todos os containers esperados estão `Up`; se ausente, alertar via Telegram (curl direto `https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage` com `$TELEGRAM_CHAT_ID`); adicionar entrada `*/5 * * * *` em `config/crontabs/jarvis` (Art. VIII.1)
 - [ ] T055 [P] Criar script de backup semanal em `config/crontabs/jarvis`: `0 3 * * 0` → dump SQLite do Firefly + tar do `/mnt/external/openclaw/` → salvar em `/mnt/external/backups/YYYY-WW/`
 - [ ] T056 Otimizar prompts em `config/openclaw/agents/jarvis/SOUL.md` por tipo de tarefa: prompt compacto para classificação (~200 tokens), prompt médio para extração (~500 tokens), prompt completo para análise (~1500 tokens) (Art. I §1.4)
 - [ ] T057 [P] Completar `docs/runbook.md`: adicionar playbooks de restart de container, restore de backup, re-pairing do WhatsApp, revogação/renovação de tokens OAuth
@@ -190,10 +195,10 @@ Grupo A (sem dependências mútuas):
 Grupo B (sem dependências mútuas):
   T022 — prompt de classificação de urgência em SOUL.md
   T023 — lógica de deduplicação em SOUL.md
-  T026 — regras de throttling em SOUL.md
+  T026 — regras de agrupamento de notificações em SOUL.md
 
 Sequencial (depende de A e B):
-  T019 → T024 → T025 → T027
+  T019 → T024 → T025 → T060 → T061 → T027
 ```
 
 ---
@@ -202,11 +207,11 @@ Sequencial (depende de A e B):
 
 | Scope | Tasks | Stories | Parallelizable |
 |-------|-------|---------|----------------|
-| MVP sugerido | T001–T027 | US1 completa | T003, T004, T006, T010, T015, T016, T017, T018, T020, T021 |
-| Fases 1–2 | T028–T038 | US2 completa | T028, T029, T030, T031 |
+| MVP sugerido | T001–T027, T060, T061 | US1 completa | T003, T004, T006, T010, T015, T016, T017, T018, T020, T021 |
+| Fases 1–2 | T028–T038, T062, T063 | US2 completa | T028, T029, T030, T031 |
 | Fases 3–4 | T039–T052 | US3 + US4 | T039, T040, T041, T047, T048 |
-| Polish | T053–T059 | — | T053, T054, T055, T057 |
-| **Total** | **59 tasks** | **4 user stories** | **~22 paralelizáveis** |
+| Polish | T053–T059, T064 | — | T053, T054, T055, T057, T064 |
+| **Total** | **64 tasks** | **4 user stories** | **~23 paralelizáveis** |
 
-**MVP recomendado**: Phases 1+2+3 (T001–T027) = infraestrutura + Skill 1 completa.
+**MVP recomendado**: Phases 1+2+3 (T001–T027, T060, T061) = infraestrutura + Skill 1 completa.
 Permite validar o loop completo WhatsApp/Gmail → Google Tasks → Telegram antes de avançar para skills mais complexas.
