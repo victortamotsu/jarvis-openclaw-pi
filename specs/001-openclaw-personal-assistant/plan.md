@@ -71,7 +71,7 @@ A implementação segue arquitetura de **agente único com skills modulares** �
 | Art. II.3 — Disco externo | Dados no HDD externo | ✅ PASS | Todos os volumes Docker apontam para `/mnt/external/` |
 | Art. III — Segurança dados | `.env` criptografado, sem portas expostas | ✅ PASS | git-crypt + Tailscale/SSH apenas; dados financeiros anonimizados via `anonymizer.py` |
 | Art. IV — Telegram principal | Toda saída via Telegram Bot | ✅ PASS | `/importar`, alertas, relatórios, diálogos — todos via Telegram |
-| Art. IV.4 — Throttling | Max 5 msg/hora (INFORMATIVO) | ✅ PASS | Regras de throttling no contrato `SendAlertRequest` em `contracts/interfaces.md` |
+| Art. IV.4 — Concisão | Digest diário para INFORMATIVO; URGENTE/CRÍTICO imediatos | ✅ PASS | Regras de agrupamento de notificações em `SOUL.md` (Art. IV.4 atualizado) |
 | Art. V — Agente único | Uma instância OpenClaw | ✅ PASS | Um agente "jarvis" com múltiplas skills; sem overhead multi-agent |
 | Art. VI — Semi-autônomo | Ações destrutivas requerem confirmação | ✅ PASS | `SendAlertRequest.action_required` + inline keyboard no Telegram |
 | Art. VI.4 — Logs | Toda ação logada | ⚠️ PENDENTE | Implementar logging centralizado em Fase 0 (logging estruturado em `/mnt/external/logs/`) |

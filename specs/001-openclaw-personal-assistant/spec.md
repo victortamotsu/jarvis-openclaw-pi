@@ -53,7 +53,8 @@ Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando
 - [ ] Updates em tasks existentes incluem timestamp e resumo da atualização nas notas
 - [ ] Classificação de urgência: INFORMATIVO / AÇÃO NECESSÁRIA / URGENTE / CRÍTICO
 - [ ] URGENTE e CRÍTICO geram alerta imediato via **Telegram**
-- [ ] Sugestões de resposta são geradas sob demanda (comando do usuário via Telegram)
+- [ ] Sugestões de resposta geradas sob demanda via comando `/responder <task_id>` no Telegram: busca contexto da task, pesquisa web via Tavily se necessário, retorna 2–3 opções de resposta formatadas
+- [ ] Agente encerra tasks automaticamente ao detectar mensagem de confirmação/encerramento ("ok, feito", "resolvido", "confirmado") vinculada a task aberta no canal original
 - [ ] Agente tem acesso a ferramentas de pesquisa web (Tavily ou similar)
 
 ### 3.2 Skill 2 — Gestor Financeiro e Fiscal
@@ -80,7 +81,8 @@ Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando
 - [ ] Relatório mensal gerado automaticamente no dia 5 de cada mês (ou sob demanda)
 - [ ] Alertas de cota disparam via **Telegram** quando atingir 80% e 100% do limite
 - [ ] Consultas em linguagem natural retornam dados do Firefly III (ex.: "quanto gastei com alimentação em fevereiro?")
-- [ ] Informe de rendimentos pode ser importado para análise consolidada anual
+- [ ] Informe de rendimentos pode ser importado para análise consolidada anual (relatório em Markdown salvo no Drive)
+- [ ] Consultas sobre investimentos (CDB, Tesouro Direto, fundos) retornam análise comparativa com taxas atuais pesquisadas via web (Tavily); dados de valor anonimizados antes de enviar ao Copilot
 - [ ] Dados financeiros sensíveis são anonimizados antes de enviar ao GitHub Copilot (mascarar nomes, valores exatos)
 - [ ] Integração com Firefly III via **MCP (mcporter)** para consultas em linguagem natural do agente; **REST API direta** para pipelines de importação e operações não cobertas pelo MCP
 
@@ -226,11 +228,16 @@ Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando
   - ✅ Agent workspace com `SOUL.md`, `AGENTS.md`, `USER.md` (contexto/personalidade)
   - ✅ Per-agent file system (para armazenar JSON com dados estruturados)
   - ❌ NÃO há knowledge graph nativo (skill Ontology ofereceria isso)
-- **Solução**: Usar combinação de:
-  1. **Workspace files** (SOUL.md): instrções de memória longa
-  2. **JSON persistente** no disco externo: dados estruturados (preferências, regras, histórico)
-  3. **AgentMemory skill** (se disponível) ou implementar wrapper JSON simples
-- **Status**: 🟡 **PARCIALMENTE NATIVO** — Session store existe, mas dados estruturados precisam de arquivo JSON customizado
+- **Pesquisa ClawHub (2026-03-03)**: Avaliadas skills de memória disponíveis:
+  - `memory-qdrant`: Plenamente local, mas requer container Qdrant (~500MB RAM) — incompatível com Art. II.1
+  - `ByteRover`: Armazena como Markdown local em `.brv/context-tree/`, mas exige LLM externo para operações `query`/`curate` básicas — consumo desnecessário de tokens do Copilot
+  - `Memory System V2`: JSON-based local — funcional equivalente ao que já planejamos, sem benefício adicional
+  - **Conclusão**: Nenhuma skill ClawHub substitui adequadamente JSON files para dados estruturados de domínio sem overhead inaceitável
+- **Solução aprovada**:
+  1. **OpenClaw memory nativo** (`memory_search`/`memory_get`): para contexto conversacional entre sessões (armazenado localmente no Pi)
+  2. **Arquivos JSON locais** em `/mnt/external/openclaw/memory/`: para dados estruturados de domínio (`owner-rules.json`, `travel-params.json`, `quota-rules.json`) — lidos/escritos por scripts e skills
+  3. **Workspace files** (SOUL.md, USER.md): instruções de comportamento e perfil do usuário
+- **Status**: 🟢 **RESOLVIDO** — Constituição Art. V.4 atualizada para permitir JSON locais para dados de domínio estruturado; contexto conversacional usa memória nativa do OpenClaw
 
 **GAP-7: Identificação de titular em transações de cartão**
 - **Impacto**: Faturas de cartão adicional listam todas as transações juntas sem identificar quem gastou
@@ -299,9 +306,9 @@ Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando
 - Criação de tasks no Google Tasks
 - Classificação básica (urgente vs normal)
 - **Alertas diferenciados via Telegram** (OPP-5 implementado):
-  - INFORMATIVO: resumo diário (max 5/hora)
-  - AÇÃO NECESSÁRIA: alerta direto (max 10/hora)
-  - URGENTE/CRÍTICO: imediato, sem limite
+  - INFORMATIVO: agrupados em resumo diário (digest às 22h, sem alerta push individual)
+  - AÇÃO NECESSÁRIA: alerta individual direto
+  - URGENTE/CRÍTICO: alerta imediato (CRÍTICO repete a cada 15min até confirmação explícita)
 - Validação: email real → task criada → alerta recebido no Telegram com criticidade apropriada
 
 ### Fase 2 — Gestor Financeiro MVP (Semana 4-5)
@@ -309,6 +316,7 @@ Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando
 - Pipeline de importação CSV + enriquecimento de titular via PDF parsing (pdf-reader-mcp)
 - Relatório mensal básico de gastos
 - Consultas em linguagem natural via Telegram
+- **Análise de investimentos** (US-2.6): consultas sobre CDB, Tesouro Direto, fundos via pesquisa web (Tavily); importação de informe de rendimentos para consolidado anual
 - **Notificações diferenciadas** (OPP-5):
   - Telegram: alertas de cota (80% e 100%) até atingir limite
   - Email: relatório consolidado no dia 5 de cada mês

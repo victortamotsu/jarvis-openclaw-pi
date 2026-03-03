@@ -50,7 +50,7 @@
 
 4.3. **Mensagens do agente devem ser concisas** (< 500 caracteres para alertas, < 2000 para relatórios). Conteúdo extenso vai para Google Drive com link compartilhado via Telegram.
 
-4.4. **O agente nunca envia mais de 5 mensagens por hora** ao usuário sem solicitação explícita, exceto alertas classificados como URGENTE/CRÍTICO.
+4.4. **O agente deve ser conciso e evitar mensagens redundantes**. Mensagens INFORMATIVO devem ser agrupadas em resumo diário (digest às 22h, sem alerta push individual). AÇÃO NECESSÁRIA gera alerta individual direto. URGENTE/CRÍTICO geram alerta imediato; CRÍTICO repete a cada 15 minutos até confirmação explícita do usuário.
 
 4.5. **Toda ação destrutiva (deletar task, enviar email, aprovar gasto) requer confirmação explícita** do usuário via Telegram antes de execução.
 
@@ -64,7 +64,9 @@
 
 5.3. **Cada skill tem escopo bem definido e documentado**. Overlaps entre skills devem ser resolvidos com uma skill "orquestradora" quando necessário.
 
-5.4. **Memory (memória persistente) é compartilhada** entre skills via ontology ou knowledge graph do OpenClaw, não via arquivos soltos.
+5.4. **Memory (memória persistente) é gerenciada em duas camadas**:
+  - **Contexto conversacional entre sessões**: usar as features nativas de memória do OpenClaw (`memory_search`/`memory_get`), que armazenam localmente no Pi.
+  - **Dados estruturados de domínio** (regras de titulares, parâmetros de viagem, cotas, preferências): **arquivos JSON locais em `/mnt/external/openclaw/memory/`** são explicitamente permitidos — esta é a abordagem correta para dados de configuração específicos do domínio que não se encaixam em memória vetorial. Nenhuma skill ClawHub de memória é necessária para este caso (todas exigem overhead incompatível com o budget de RAM do Art. II.1 ou dependência de LLM para operações básicas).
 
 ---
 
