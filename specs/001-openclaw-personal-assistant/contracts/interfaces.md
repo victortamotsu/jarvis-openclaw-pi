@@ -264,7 +264,7 @@ git add . && git commit -m "feat: scaffold spec-driven project" && git push
 | `pendencias` | 1 | Lista tasks abertas por urgência |
 | `gastos` | 2 | Resumo de gastos do mês atual |
 | `gastos <pessoa>` | 2 | Gastos filtrados por membro da família |
-| `importar` | 2 | Inicia fluxo de importação (aguarda CSV/PDF no Drive) |
+| `importar` | 2 | Busca PDF+CSV mais recente em `Jarvis/imports/` no Drive → executa pipeline de enriquecimento → importa no Firefly III → confirma via Telegram |
 | `viagem <destino>` | 3 | Busca instantânea de passagens |
 | `monitorar <destino> <datas>` | 3 | Ativa monitoramento contínuo |
 | `ideia <descrição>` | 4 | Registra nova ideia de projeto |

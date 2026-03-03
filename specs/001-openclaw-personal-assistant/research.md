@@ -250,6 +250,54 @@ Manter exportação manual de CSV/PDF como fluxo padrão. O agente cria lembrete
 
 ## 6. Referência Cruzada
 
-- Pesquisa original: `../OPENCLAWPI_RESEARCH.md`
 - Constituição: `../../.specify/memory/constitution.md`
 - Especificação: `./spec.md`
+- Plano de implementação: `./plan.md`
+
+---
+
+## 7. Atualizações Pós-Clarificação (2026-03-03)
+
+Decisões coletadas na sessão `/speckit.clarify`. Substituem ou complementam seções anteriores.
+
+### 7.1 Firefly III: MCP primário + REST fallback *(atualiza §1.3)*
+
+| Camada | Mecanismo | Uso |
+|--------|-----------|-----|
+| **Primária** | `mcporter` (MCP server) | Consultas em linguagem natural via OpenClaw agent tools |
+| **Fallback** | Firefly III REST API direto | Operações de importação e casos não cobertos pelo MCP |
+
+**Decisão**: MCP como interface padrão do agente, preparando ambiente para outros MCPs futuros (Google Tasks MCP, Telegram MCP, etc.). REST como fallback operacional nos scripts do pipeline.
+
+### 7.2 Gmail: Skill nativa OpenClaw primária *(atualiza §3)*
+
+| Prioridade | Mecanismo | Condição |
+|-----------|-----------|----------|
+| **1ª** | Skill Gmail nativa (ClawHub) | Disponível e cobrindo os scopes necessários |
+| **2ª** | Gmail API REST (OAuth 2.0) | Skill indisponível ou insuficiente |
+
+**Justificativa**: Consistência com WhatsApp (skill nativa) e visão de usar skills ClawHub como interface padrão de integrações; mantém número de componentes custom ao mínimo.
+
+### 7.3 Armazenamento de credenciais: `.env` + `git-crypt` *(atualiza §5)*
+
+- **Mecanismo**: Arquivo `.env` com todos os tokens e secrets
+- **Criptografia em repouso**: `git-crypt` (ou `sops` como alternativa)
+- **Permissões**: 600 no Pi host
+- **Montagem**: Volume Docker no `docker-compose.yml`
+- **Commitado**: Sim, mas como binário criptografado (legível apenas com chave GPG)
+- **Nunca em plain text**: `.env.example` é o template commitado; `.env` real é criptografado
+
+### 7.4 WhatsApp: Skill nativa OpenClaw *(confirma §3, atualiza deployment)*
+
+- **Deployment**: Skill nativa `openclaw-whatsapp` rodando dentro do runtime OpenClaw
+- **Sem container Docker separado**: economiza ~100-150MB de RAM e simplifica orquestração
+- **QR pairing**: executado via interface do OpenClaw no setup inicial
+- **Fallback**: se skill quebrar ou ser banida, sistema continua via Telegram + Gmail
+
+### 7.5 Gatilho de importação PDF/CSV: comando `/importar` via Telegram
+
+- **Fluxo**: Usuário salva PDF/CSV na pasta `Jarvis/imports/` do Google Drive → envia `/importar` no Telegram
+- **Ação do agente**: busca arquivo mais recente na pasta configurada → executa pipeline de importação
+- **Sem monitoramento assíncrono do Drive**: evita polling contínuo e reduz uso de tokens
+- **Confirmação**: agente responde no Telegram com resultado da importação (sucesso/erro/itens importados)
+
