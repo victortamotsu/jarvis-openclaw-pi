@@ -1,0 +1,59 @@
+# Crontab configuration for Jarvis scheduler container
+#
+# Task T025: Define execution schedule for Skill 1 (Pendências MVP
+#
+# Note: This file is copied to /var/spool/cron/crontabs/root in scheduler container
+#       during docker-compose up. Edit this file, then: docker-compose restart scheduler
+
+# ─────────────────────────────────────────────────────────────────────
+# Skill 1: Gestor de Pendências (T024-T025-T026)
+# ─────────────────────────────────────────────────────────────────────
+
+# 3.01: Check emails & WhatsApp every 15 minutes (9am-11pm)
+# Edge times: skip 11pm-9am to reduce noise (sleeping hours)
+*/15 9-22 * * * /home/pi/jarvis-openclaw-pi/scripts/check-channels.sh >> /mnt/external/logs/openclaw/cron.log 2>&1
+
+# 3.02: Daily summary digest at 22:00 (10pm) — Groups INFORMATIVO items
+0 22 * * * docker-compose -f /home/pi/jarvis-openclaw-pi/docker-compose.yml exec -T openclaw openclaw agent --message "Resumo diário de pendências (INFORMATIVO agrupado). Listar tasks criadas hoje por urgência. Incluir contador: X INFORMATIVO | Y ACAO_NECESSARIA | Z URGENTE | W CRITICO." >> /mnt/external/logs/openclaw/cron.log 2>&1
+
+# 3.03: Monthly report on 5th at 9am (Skill 2, but triggers end-of-US1 cycle)
+# Created by T025, but triggers T004/T001 via monthly_report.sh (Phase 4)
+0 9 5 * * /home/pi/jarvis-openclaw-pi/scripts/monthly-report.sh >> /mnt/external/logs/openclaw/cron.log 2>&1
+
+# ─────────────────────────────────────────────────────────────────────
+# Skill 2: Gestor Financeiro (planned Phase 4)
+# ─────────────────────────────────────────────────────────────────────
+
+# Import reminder on last day of month at 8am
+# (Remind to import previous month's statement before new month starts)
+0 8 L * * docker-compose -f /home/pi/jarvis-openclaw-pi/docker-compose.yml exec -T openclaw openclaw agent --message "Lembrete: importar extrato de mês anterior. Arquivo deve estar em Jarvis/imports/ no Google Drive." >> /mnt/external/logs/openclaw/cron.log 2>&1
+
+# ─────────────────────────────────────────────────────────────────────
+# Skill 3: Ajudante de Viagens (planned Phase 5)
+# ─────────────────────────────────────────────────────────────────────
+
+# Daily travel deal monitoring at 7am (checks active searches)
+0 7 * * * docker-compose -f /home/pi/jarvis-openclaw-pi/docker-compose.yml exec -T openclaw openclaw agent --message "Verificar deals de viagem para buscas ativas em travel-params.json. Alertar se encontrar dentro do orçamento com tabela comparativa si >=2 resultados." --max-tokens 1500 >> /mnt/external/logs/openclaw/cron.log 2>&1
+
+# ─────────────────────────────────────────────────────────────────────
+# System Maintenance
+# ─────────────────────────────────────────────────────────────────────
+
+# Health check: ping gateway every 30 minutes
+*/30 * * * * curl -s http://127.0.0.1:3000/health > /dev/null 2>&1 || echo "Health check failed" >> /mnt/external/logs/openclaw/health.log
+
+# Logrotate daily at 2am
+0 2 * * * /usr/sbin/logrotate /home/pi/jarvis-openclaw-pi/config/logrotate.conf >> /mnt/external/logs/openclaw/cron.log 2>&1
+
+# ─────────────────────────────────────────────────────────────────────
+# Environment
+# ─────────────────────────────────────────────────────────────────────
+
+# Use non-interactive shell
+SHELL=/bin/bash
+
+# Load .env for docker-compose commands
+PATH=/home/pi/jarvis-openclaw-pi:/home/pi/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Log all cron output
+MAILTO=root

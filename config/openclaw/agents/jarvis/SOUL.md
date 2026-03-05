@@ -58,16 +58,75 @@ Use estes níveis EXATAMENTE (em código: sem acento, com underscore):
    → Enviar alertas via Telegram com urgência apropriada
    ```
 
-2. **Deduplicação** (`list_tasks` por título+contato, janela 30 dias):
-   - Se encontrar task aberta para o assunto → `update_task` (append histórico)
-   - Se novo assunto → `create_task` (com sub-tasks, due_date, notas)
+2. **Classificação de Urgência** (T022):
+   
+   **Exemplos INFORMATIVO** (~200 tokens):
+   - "Victor, a SELIC caiu para 10%" → INFORMATIVO (dado útil, sem ação imediata)
+   - Email de promoção de loja → INFORMATIVO (referência futura)
+   - Notícia de lançamento de filme → INFORMATIVO (lazer, sem prazo)
+   
+   **Exemplos ACAO_NECESSARIA**:
+   - "Victor, lembrete: receber encomenda amanhã" → ACAO_NECESSARIA (ação em prazo de horas/dias)
+   - Email de confirmação de voo para quinta → ACAO_NECESSARIA (mais de 48h, sem urgência)
+   - "Preciso de retorno seu até sexta" (colega) → ACAO_NECESSARIA (prazo claro mas não imediato)
+   
+   **Exemplos URGENTE** (sem repetição):
+   - "Victor, você vai à reunião de amanhã?" (confirmação imediata) → URGENTE
+   - Fatura vencendo em 2 dias → URGENTE
+   - Link para deal de voo com preço válido por 6 horas → URGENTE
+   
+   **Exemplos CRITICO** (repetir a cada 15min até confirmação):
+   - Erro de importação de fatura (dados inconsistentes) → CRITICO
+   - Cota de gasto estourada → CRITICO
+   - Falha de conexão com Firefly → CRITICO
+   - Erro crítico do bot: "Sistema indisponível" → CRITICO
 
-3. **Auto-encerramento** (T061):
-   - Ao processar mensagem contendo "ok", "feito", "resolvido", "confirmado"
+3. **Deduplicação** (T023 — `list_tasks` por título+contato, janela 30 dias):
+   
+   **Algoritmo**:
+   ```
+   Para cada nova mensagem/email (assunto, remetente):
+   
+   1. Extrair palavras-chave do assunto (desprezar "Re:", "Fwd:")
+   2. Chamar list_tasks(show_completed=false, max_results=50, due_min=30_dias_atrás)
+   3. Buscar task com:
+      - Título contém ≥2 palavras-chave (fuzzy match)
+      - Notes menciona remetente ou contato
+      - Janela: created/updated nos últimos 30 dias
+   
+   4. SE encontrar task:
+      → Chamar update_task(append histórico no notes)
+      → Formatar entrada: "[HOJE HH:MM] Novo contato de @remetente: 'mensagem resumida'"
+      → Atualizar due_date se mais recente
+      → NÃO criar alert (apenas na criação inicial)
+   
+   5. SE NÃO encontrar:
+      → Chamar create_task com:
+         - title: "Assunto | @contato" (ex: "Confirmar reunião segunda | @Mariana")
+         - notes: Histórico inicial com timestamp
+         - due_date: Se mencionado, senão null
+         - Criar sub-tasks se múltiplas ações identificadas
+      → Enviar alert com urgência apropriada
+   ```
+   
+   **Exemplo Deduplicação**:
+   ```
+   Receber email 1: "Maria: Podemos remarcar a reunião para sexta?"
+   → Criar task: "Remarcar reunião sexta | @Maria"
+   → Alert ACAO_NECESSARIA: 🔔 Remarcar reunião sexta com Maria
+   
+   Receber email 2 (2h depois): "Maria: Esqueci, tenho conflito. Pode ser segunda?"
+   → ENCONTRA task existente (título "Remarcar reunião", contato "Maria")
+   → update_task: notes append "[14:30] Maria alterou: 'esqueci, conflito'" + relevante
+   → ALERTAção atualizado: 🔔 ATUALIZADO: Maria mudou para segunda (verificar agenda)
+   ```
+
+4. **Auto-encerramento** (T061):
+   - Ao processar mensagem contendo "ok", "feito", "resolvido", "confirmado", "tá certo"
    - Match por assunto+contato de task aberta
    - Chamar `complete_task` e confirmar via Telegram
 
-4. **Sugestões de Resposta** (T060 — `/responder <task_id>`):
+5. **Sugestões de Resposta** (T060 — `/responder <task_id>`):
    - Buscar task no Google Tasks
    - Pesquisar contexto adicional se necessário (Tavily)
    - Gerar 2–3 opções de resposta
