@@ -41,11 +41,12 @@
 0 8 L * * docker-compose -f /home/pi/jarvis-openclaw-pi/docker-compose.yml exec -T openclaw openclaw agent --message "Lembrete: importar extrato de mês anterior. Arquivo deve estar em Jarvis/imports/ no Google Drive." >> /mnt/external/logs/openclaw/cron.log 2>&1
 
 # ─────────────────────────────────────────────────────────────────────
-# Skill 3: Ajudante de Viagens (planned Phase 5)
+# Skill 3: Ajudante de Viagens (Phase 5)
 # ─────────────────────────────────────────────────────────────────────
 
-# Daily travel deal monitoring at 7am (checks active searches)
-0 7 * * * docker-compose -f /home/pi/jarvis-openclaw-pi/docker-compose.yml exec -T openclaw openclaw agent --message "Verificar deals de viagem para buscas ativas em travel-params.json. Alertar se encontrar dentro do orçamento com tabela comparativa si >=2 resultados." --max-tokens 1500 >> /mnt/external/logs/openclaw/cron.log 2>&1
+# T044: Daily travel deal monitoring at 7am
+# (Checks active searches in travel-params.json, alerts if deals found)
+0 7 * * * docker-compose -f /home/pi/jarvis-openclaw-pi/docker-compose.yml exec -T openclaw openclaw agent --message "Verificar deals de viagem para buscas ativas em travel-params.json. Alertar se encontrar dentro do orçamento com tabela comparativa se >=2 resultados. Criar task em Google Tasks para cada deal com deadline 48h." --max-tokens 2000 >> /mnt/external/logs/openclaw/travel-deals.log 2>&1
 
 # ─────────────────────────────────────────────────────────────────────
 # System Maintenance

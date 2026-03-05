@@ -572,43 +572,249 @@ Atualizar quota-rules.json + alertar se necessário
 ## 5. Skill 3 — Ajudante de Viagens
 
 ### Escopo
-- Parametrização: destinos, datas, orçamento, preferências
-- Monitoramento contínuo de deals
+- Parametrização: destinos, datas, orçamento, preferências via `/monitorar`
+- Monitoramento contínuo de deals (cron diário 7am)
 - Alertas formatados com tabela comparativa
+- Integração com Google Tasks (criar reminders de análise)
 
-### Parâmetros Persistentes
+### T039: Schema travel-params.json
 
 Arquivo: `/mnt/external/openclaw/memory/travel-params.json`
+
 ```json
 {
-  "active": true,
-  "destinations": ["Orlando", "NYC", "Paris"],
-  "travel_dates": [
-    {"start": "2026-06-01", "end": "2026-06-15"},
-    {"start": "2026-12-15", "end": "2026-12-31"}
+  "searches": [
+    {
+      "id": "us-florida-jun2026",
+      "active": true,
+      "destinations": ["Orlando", "Miami"],
+      "travel_dates": {
+        "start": "2026-06-01",
+        "end": "2026-06-15",
+        "duration_days": 15
+      },
+      "travelers": {
+        "adults": 2,
+        "children": 2,
+        "total": 4
+      },
+      "budget": {
+        "max_per_person": 5000,
+        "max_total": 20000,
+        "currency": "BRL"
+      },
+      "preferences": {
+        "airlines": ["GOL", "LATAM", "UNITED", "AZUL"],
+        "max_connections": 2,
+        "preferred_times": ["morning", "afternoon"],
+        "hotel_type": "4-star+",
+        "location_priority": "city_center"
+      },
+      "created_at": "2026-03-04T10:00:00Z",
+      "last_checked": "2026-03-04T07:00:00Z",
+      "deals_found": []
+    }
   ],
-  "travelers": 4,
-  "budget": {"max_per_person": 5000, "max_total": 20000},
-  "preferences": {
-    "max_connections": 2,
-    "hotel_type": "4-star+",
-    "location_priority": "city_center"
-  }
+  "schema_version": "1.0",
+  "updated_at": "2026-03-04T10:00:00Z"
 }
 ```
 
-### Deal Detection (T043)
+### T042: Handler `/monitorar`
 
-1. **1 resultado**: Alerta simples — "Voo Orlando R$2500/pessoa, 1 conexão"
-2. **≥2 resultados**: Tabela comparativa:
+**Trigger**: User envia `/monitorar <destino> <datas> <orçamento>` via Telegram
 
+**Formato**: `/monitorar Orlando 01/06-15/06 5000`
+
+**Algoritmo**:
 ```
-| Airline | Preço Total | /Pessoa | Conexões | Link |
-|---------|-------------|---------|----------|------|
-| GOL     | R$10000     | R$2500  | 1        | [link] |
-| LATAM   | R$11200     | R$2800  | 2        | [link] |
-| UNITED  | R$12000     | R$3000  | 1        | [link] |
+1. Receber comando via Telegram
+2. Parsear componentes:
+   - Destino(s): "Orlando" (pode ser lista: "Orlando, Miami, Tampa")
+   - Datas: "01/06-15/06" → start=2026-06-01, end=2026-06-15
+   - Orçamento: "5000" → max_per_person = 5000 BRL
+   - Viajantes: Default 4 (Victor + spouse + 2 children)
+3. Criar entry em travel-params.json:
+   - id: "destino-mmyy-HASH(first3chars)" → "orlando-jun2026-abc123"
+   - active: true
+   - created_at: timestamp agora
+   - deals_found: [] (vazio, será preenchido nas próximas buscas)
+4. Confirmar via Telegram:
+   - Format: "✅ Monitorando Orlando (01-15 jun) para 4 viajantes, orçamento R$5000/pessoa"
+   - Link para próximas buscas
+   - Mensagem: "Busca automática diária às 7am. Você receberá alerta se encontrar deal!"
 ```
+
+**Exemplo Interaction**:
+```
+Victor: /monitorar Orlando 01/06-15/06 5000
+Jarvis: ✅ Monitorando Orlando (01-15 de junho) para 4 viajantes, orçamento R$5.000/pessoa
+        🔍 Busca automática diária às 7h
+        ⏰ Próxima verificação: amanhã 07:00
+```
+
+### T043: Deal Detection & Alerting
+
+**Trigger**: Cron `0 7 * * *` (7am daily) para buscas ativas
+
+**Algoritmo**:
+```
+1. Carregar travel-params.json
+2. Para cada search com active=true:
+   a) Extrair: destinations, travel_dates, budget, travelers
+   b) Executar 2 buscas paralelas:
+      - Flight Search: "Orlando flights 01/06-15/06 for 4 passengers"
+      - Tavily: "cheap flights Orlando June 2026"
+   c) Consolidar resultados:
+      ```json
+      [
+        {
+          "airline": "GOL",
+          "total_price": 10000,
+          "price_per_person": 2500,
+          "connections": 1,
+          "departure": "2026-06-01 08:00",
+          "arrival": "2026-06-01 18:30",
+          "link": "https://..."
+        },
+        { ... }
+      ]
+      ```
+   d) Filtrar por orçamento:
+      - price_per_person <= budget.max_per_person → DEAL ✅
+   e) Se nenhum deal encontrado:
+      - Log: "No deals found for Orlando"
+      - Não enviar alerta (silencioso)
+   f) Se ≥1 deal encontrado:
+      - Salvar em travel_params.json: deals_found.push(resultado)
+      - Disparar T045 (notificador de deals)
+```
+
+### T044: Alertas de Deals
+
+**1 Resultado Encontrado** → Alerta simples:
+```
+✈️ DEAL ENCONTRADO!
+
+Orlando (01-15 Jun) — 4 viajantes
+Airline: GOL
+Preço total: R$ 10.000
+Preço/pessoa: R$ 2.500 ✅ (dentro do orçamento)
+Conexões: 1
+Saída: 01/06 08:00
+Chegada: 01/06 18:30
+
+🔗 [Ver passagens](https://skyscanner.com/...)
+⏰ Válido por 48 horas
+
+[Análise em 48h] [Ignorar]
+```
+
+**≥2 Resultados Encontrados** → Tabela comparativa:
+```
+✈️ DEALS ENCONTRADOS!
+
+Orlando (01-15 Jun) — 4 viajantes, Orçamento R$ 5.000/pessoa
+
+| Airline | Preço Total | /Pessoa | Conexões | Saída | Análise |
+|---------|-------------|---------|----------|-------|---------|
+| GOL     | R$10.000    | R$2.500 | 1        | 08:00 | [+] |
+| LATAM   | R$11.200    | R$2.800 | 2        | 10:30 | [+] |
+| UNITED  | R$12.000    | R$3.000 | 1        | 14:00 | [+] |
+
+💡 Todos os preços estão dentro do orçamento!
+⏰ Válido por 48 horas
+
+[Análise Completa](link) [Ignorar]
+```
+
+### T045: Notificação & Task Creation
+
+**Fluxo**:
+```
+1. Deal encontrado (T043) → dispara notificação
+2. Enviar alerta via Telegram:
+   - Format: escolher entre simple (1 resultado) ou table (≥2 resultados)
+   - Urgency: URGENTE (não é CRITICO, mas requer ação em 48h)
+3. Criar task no Google Tasks (via MCP):
+   - create_task():
+     Title: "✈️ Analisar deal: Orlando R$2500/pessoa"
+     Notes: |
+       Deal encontrado em 04/03/2026 às 07:15
+       Airline: GOL
+       Rota: Orlando (01-15 jun)
+       Preço/pessoa: R$ 2.500 (orçamento: R$ 5.000)
+       Link: https://skyscanner.com/...
+       
+       Ação: Revisão em 48h (válido até 06/03)
+     Due_date: "2026-03-06" (hoje + 2 dias)
+     Category: "VIAGENS"
+     Urgency: "URGENTE"
+     Subtasks:
+       ☐ Verificar datas com spouse
+       ☐ Consultar preço hotel
+       ☐ Confirmar disponibilidade
+4. Armazenar alerta em logs:
+   - File: /mnt/external/logs/travel-deals.json
+   - Entry: {timestamp, destination, price, airline, link}
+```
+
+**Exemplo Task Criada**:
+```
+✈️ Analisar deal: Orlando R$2.500/pessoa
+   Category: VIAGENS
+   Due: 06/03/2026 (em 2 dias)
+   Urgency: URGENTE
+   
+   ☐ Verificar datas com spouse
+   ☐ Consultar preço hotel
+   ☐ Confirmar disponibilidade
+```
+
+### T046: E2E Validation Scenarios
+
+**(Ver PHASE5_US3_TRAVEL.md para detalhes)**
+
+**Scenario 1**: Define travel parameters
+```
+/monitorar Orlando 01/06-15/06 5000
+→ Entry criada em travel-params.json
+→ Confirmação via Telegram
+```
+
+**Scenario 2**: Daily search finds deal
+```
+Cron 07:00: Flight search executa
+→ 1+ resultados encontrados dentro do orçamento
+→ Alerta Telegram enviado (simples ou tabela)
+→ Task criada em Google Tasks
+```
+
+**Scenario 3**: No deals found
+```
+Cron 07:00: Flight search executa
+→ Nenhum resultado dentro do orçamento
+→ Silent (sem Telegram, sem task)
+→ Log: "No deals for Orlando"
+```
+
+**Scenario 4**: Multiple searches active
+```
+travel-params.json: 3 searches ativas
+Cron 07:00 executa todas
+→ Deals de cada uma consolidadas
+→ Alertas por destino (separados)
+→ Tasks por destino (separadas)
+```
+
+**Success Criteria**:
+- ✅ Parameters accepted via /monitorar
+- ✅ travel-params.json updated
+- ✅ Daily search executed at 7am
+- ✅ Deals detected and formatted
+- ✅ Telegram alerts sent correctly
+- ✅ Tasks created in Google Tasks
+- ✅ Logs recorded for tracking
 
 ---
 

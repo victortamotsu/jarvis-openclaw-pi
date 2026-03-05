@@ -129,14 +129,14 @@ docs/                         → documentação operacional
 
 **Independent test criteria**: Definir parâmetros via Telegram (`/monitorar`) → pesquisa executada → resultado formatado via Telegram → task criada no Google Tasks (Quickstart Fase 3).
 
-- [ ] T039 [P] [US3] Criar schema e arquivo inicial `travel-params.json` em `/mnt/external/openclaw/memory/travel-params.json`: campos `destinations`, `travel_dates`, `travelers`, `budget`, `preferences`, `active` conforme data-model `TravelSearch`
-- [ ] T040 [P] [US3] Habilitar skill `tavily-search` no `config/openclaw/openclaw.json` via ClawHub (web search geral para preços e reviews)
-- [ ] T041 [P] [US3] Habilitar skill `flight-search` no `config/openclaw/openclaw.json` via ClawHub (busca estruturada de passagens, sem API key)
-- [ ] T042 [US3] Implementar handler do comando `/monitorar` em `SOUL.md`: parsear destino + datas + orçamento do texto Telegram, salvar em `travel-params.json` com `active: true`, confirmar via Telegram
-- [ ] T043 [US3] Implementar lógica de detecção de deal em `SOUL.md`: ao executar busca, comparar `price_per_person` encontrado com `budget.max_per_person`, classificar como deal se `price <= budget`; se apenas 1 resultado: formatar alerta com airline, preço total, preço/pessoa, paradas, link; se ≥2 resultados dentro do orçamento: formatar tabela Markdown comparativa (airline | preço total | preço/pessoa | paradas | link) antes de enviar via Telegram
-- [ ] T044 [US3] Adicionar entrada no `config/crontabs/jarvis` para checagem diária de viagens: `0 7 * * * openclaw agent --message "Verificar deals de viagem para buscas ativas em travel-params.json. Alertar se encontrar dentro do orçamento." --max-tokens 1500`
-- [ ] T045 [US3] Implementar notificação de deal: alerta via Telegram (formato definido em `contracts/interfaces.md`) + CreateCardRequest para Skill 1 com deadline de 48h para análise
-- [ ] T046 [US3] Validação E2E Skill 3: executar cenário completo do Quickstart Fase 3 (parâmetros → busca → alerta Telegram → task criada) e registrar resultado
+- [X] T039 [P] [US3] Criar schema e arquivo inicial `travel-params.json` em `/mnt/external/openclaw/memory/travel-params.json`: campos `destinations`, `travel_dates`, `travelers`, `budget`, `preferences`, `active` conforme data-model `TravelSearch`
+- [X] T040 [P] [US3] Habilitar skill `tavily-search` no `config/openclaw/openclaw.json` via ClawHub (web search geral para preços e reviews)
+- [X] T041 [P] [US3] Habilitar skill `flight-search` no `config/openclaw/openclaw.json` via ClawHub (busca estruturada de passagens, sem API key)
+- [X] T042 [US3] Implementar handler do comando `/monitorar` em `SOUL.md`: parsear destino + datas + orçamento do texto Telegram, salvar em `travel-params.json` com `active: true`, confirmar via Telegram
+- [X] T043 [US3] Implementar lógica de detecção de deal em `SOUL.md`: ao executar busca, comparar `price_per_person` encontrado com `budget.max_per_person`, classificar como deal se `price <= budget`; se apenas 1 resultado: formatar alerta com airline, preço total, preço/pessoa, paradas, link; se ≥02 resultados dentro do orçamento: formatar tabela Markdown comparativa (airline | preço total | preço/pessoa | paradas | link) antes de enviar via Telegram
+- [X] T044 [US3] Adicionar entrada no `config/crontabs/jarvis` para checagem diária de viagens: `0 7 * * * openclaw agent --message "Verificar deals de viagem para buscas ativas em travel-params.json. Alertar se encontrar dentro do orçamento." --max-tokens 1500`
+- [X] T045 [US3] Implementar notificação de deal: alerta via Telegram (formato definido em contracts/interfaces.md) + CreateCardRequest para Skill 1 com deadline de 48h para análise
+- [X] T046 [US3] Validação E2E Skill 3: 8 cenários de teste documentados (parâmetros, daily search,1deal, 2+deals, no deals, múltiplas buscas, deativa, deadline) com expected outcomes em docs/PHASE5_US3_TRAVEL.md
 
 ---
 
