@@ -49,13 +49,13 @@ docs/                         → documentação operacional
 
 **Purpose**: Estrutura do repositório, Docker Compose base, credenciais e workspace do agente.
 
-- [ ] T001 Criar estrutura de diretórios do repositório conforme plan.md: `config/openclaw/agents/jarvis/`, `config/crontabs/`, `skills/google-tasks/`, `skills/firefly-mcp/`, `scripts/`, `pipeline/`, `docs/`
-- [ ] T002 Criar `docker-compose.yml` com serviços base: `firefly-iii` (existente) + `openclaw` (mem_limit: 1g, volume /mnt/external/openclaw) + `scheduler` (Alpine cron, mem_limit: 64m); incluir bloco `healthcheck` para cada serviço: `openclaw` (HTTP GET /health a cada 30s, timeout 10s, start_period 60s), `firefly-iii` (HTTP GET / a cada 60s), `scheduler` (cmd test a cada 60s) — Art. VIII.1
-- [ ] T003 [P] Criar `.env.example` com todas as variáveis necessárias: `GITHUB_TOKEN`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `FIREFLY_TOKEN`, `FIREFLY_URL`
-- [ ] T004 Configurar `git-crypt`: adicionar `.gitattributes` com `*.env filter=git-crypt diff=git-crypt`, documentar setup em `docs/runbook.md` (seção "Setup inicial") *(depende T007 — runbook deve existir antes)*
-- [ ] T005 Criar `config/openclaw/agents/jarvis/SOUL.md` com personalidade do agente, instruções de comportamento (concisão, throttling, confirmação antes de ações destrutivas), e mapeamento de skills disponíveis
-- [ ] T006 [P] Criar `config/openclaw/agents/jarvis/USER.md` com perfil de Victor (preferências, família: spouse, child1, child2) e `config/openclaw/agents/jarvis/AGENTS.md` com referência às skills disponíveis
-- [ ] T007 [P] Criar `docs/runbook.md` com seções iniciais: Setup inicial, Restart de containers, Backup manual, Troubleshooting comum
+- [X] T001 Criar estrutura de diretórios do repositório conforme plan.md: `config/openclaw/agents/jarvis/`, `config/crontabs/`, `skills/google-tasks/`, `skills/firefly-mcp/`, `scripts/`, `pipeline/`, `docs/`
+- [X] T002 Criar `docker-compose.yml` com serviços base: `firefly-iii` (existente) + `openclaw` (mem_limit: 1g, volume /mnt/external/openclaw) + `scheduler` (Alpine cron, mem_limit: 64m); incluir bloco `healthcheck` para cada serviço: `openclaw` (HTTP GET /health a cada 30s, timeout 10s, start_period 60s), `firefly-iii` (HTTP GET / a cada 60s), `scheduler` (cmd test a cada 60s) — Art. VIII.1
+- [X] T003 [P] Criar `.env.example` com todas as variáveis necessárias: `GITHUB_TOKEN`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `FIREFLY_TOKEN`, `FIREFLY_URL`
+- [X] T004 Configurar `git-crypt`: adicionar `.gitattributes` com `*.env filter=git-crypt diff=git-crypt`, documentar setup em `docs/runbook.md` (seção "Setup inicial") *(depende T007 — runbook deve existir antes)*
+- [X] T005 Criar `config/openclaw/agents/jarvis/SOUL.md` com personalidade do agente, instruções de comportamento (concisão, throttling, confirmação antes de ações destrutivas), e mapeamento de skills disponíveis
+- [X] T006 [P] Criar `config/openclaw/agents/jarvis/USER.md` com perfil de Victor (preferências, família: spouse, child1, child2) e `config/openclaw/agents/jarvis/AGENTS.md` com referência às skills disponíveis
+- [X] T007 [P] Criar `docs/runbook.md` com seções iniciais: Setup inicial, Restart de containers, Backup manual, Troubleshooting comum
 
 ---
 
