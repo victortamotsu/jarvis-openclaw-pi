@@ -820,21 +820,170 @@ Cron 07:00 executa todas
 
 ## 6. Skill 4 — Agente Programador
 
-### Fluxo `/ideia`
+### Escopo
+- Capturar ideias de projetos via `/ideia`
+- Pesquisar soluções existentes (context gathering)
+- Criar repositório GitHub com spec-kit
+- Gerar spec.md inicial com contexto
+- Registrar em Google Tasks
 
+### T049: Handler `/ideia`
+
+**Trigger**: User envia `/ideia <descrição>` via Telegram
+
+**Formato**: `/ideia CLI tool para gerenciar dependências de projetos`
+
+**Algoritmo**:
 ```
-/ideia [descrição]
-  ↓
-Pesquisar soluções existentes (Tavily)
-  ↓
-Responder com: Soluções encontradas + diferencial proposto
-  ↓
-Botão: [✅ CRIAR PROJETO] [❌ CANCELAR]
-  ↓
-Se ✅: Executar create-project.sh
-        Preencher spec.md com contexto do diálogo
-        Registrar no Google Tasks
-        Reportar URL do repo
+1. Receber ideia via Telegram
+2. Extrair descrição + contexto (se fornecido)
+3. Pesquisar via Tavily:
+   - Query: "[idea] existing solutions 2026"
+   - Buscar: ferramentas similares, mercado, trends
+4. Analisar resultados:
+   - Listar 2-3 soluções existentes
+   - Identificar gap/oportunidade
+   - Extrair diferencial proposto
+5. Responder para confirmação:
+   ```
+   💡 Analisando sua ideia...
+   
+   Solução: CLI Tool para dependências
+   
+   Soluções existentes:
+   • npm-check-updates (npm packages)
+   • cargo-update (Rust dependencies)
+   • pip-audit (Python security)
+   
+   Diferencial seu:
+   ✨ Suportar múltiplas linguagens (node, python, rust, go)
+   ✨ Integração com GitHub → PRs automáticas
+   ✨ Relatório consolidado
+   
+   [✅ CRIAR PROJETO] [❌ CANCELAR]
+   ```
+6. Aguardar confirmação do Victor
+```
+
+### T050: Fluxo de Criação (Project Flow)
+
+**Trigger**: Victor confirma [✅ CRIAR PROJETO]
+
+**Algoritmo**:
+```
+1. Gerar nome-de-projeto (kebab-case):
+   - Input: "CLI tool para dependências"
+   - Output: "cli-dependency-manager"
+   
+2. Executar scripts/create-project.sh:
+   - bash scripts/create-project.sh "cli-dependency-manager" "Gerenciador de dependências multi-linguagem"
+   - Aguardar conclusão (~30 segundos)
+   - Output: GitHub URL + local path
+   
+3. Reportar via Telegram:
+   ```
+   ✅ Repositório criado!
+   
+   📦 Projeto: cli-dependency-manager
+   🔗 GitHub: https://github.com/victortamotsu/cli-dependency-manager
+   📂 Local: /mnt/external/projects/cli-dependency-manager
+   📝 Spec: /mnt/external/projects/cli-dependency-manager/spec.md
+   
+   Spec.md gerado com contexto do diálogo.
+   Próximo passo: Desenvolver!
+   ```
+   
+4. Preencher spec.md com contexto:
+   - Descrição da ideia
+   - Soluções existentes encontradas
+   - Diferencial proposto
+   - MVP scope (preliminary)
+   - Link para diálogo original (se possível)
+   
+5. Fazer commit inicial:
+   ```
+   git add spec.md
+   git commit -m "docs: initial spec with context from Jarvis ideation"
+   git push
+   ```
+```
+
+### T051: Registro em Google Tasks
+
+**Trigger**: Após criar projeto (dentro de T050)
+
+**Algoritmo**:
+```
+1. Extrair informações:
+   - Projeto: "cli-dependency-manager"
+   - GitHub URL: "https://github.com/victortamotsu/cli-dependency-manager"
+   - Descrição da ideia: "[descrição]"
+   - Timestamp: Data/hora criação
+   
+2. Chamar create_task (google-tasks MCP):
+   ```
+   create_task({
+     "title": "🚀 Projeto: cli-dependency-manager",
+     "notes": "Ideia: CLI tool para gerenciar dependências\n\nGitHub: https://github.com/victortamotsu/cli-dependency-manager\n\nDiferencial:\n• Suportar múltiplas linguagens\n• Integração com GitHub\n• Relatório consolidado\n\nStatus: Repo criado, spec.md pronto\nPróximo: Implementar MVP",
+     "category": "PROJETO_TI",
+     "urgency": "INFORMATIVO",
+     "subtasks": [
+       "Define MVP scope",
+       "Setup development environment",
+       "Implement core features",
+       "Write tests",
+       "Deploy"
+     ]
+   })
+   ```
+   
+3. Responder via Telegram:
+   ```
+   ✅ Task criada em Google Tasks
+   
+   📋 Título: 🚀 Projeto: cli-dependency-manager
+   🏷️ Categoria: PROJETO_TI
+   
+   Subtasks criadas para guiar desenvolvimento
+   ```
+```
+
+### T052: E2E Validation (Project Creation)
+
+**Scenario 1**: Create project via `/ideia`
+```
+Victor: /ideia CLI tool para gerenciar dependências
+  → Tavily search executa
+  → Soluções existentes encontradas
+  → Diferencial proposto
+  → [✅ CRIAR PROJETO] button
+```
+
+**Scenario 2**: Confirm and create repo
+```
+Victor: Taps [✅ CRIAR PROJETO]
+  → scripts/create-project.sh executa
+  → GitHub repo criado
+  → Local clone em /mnt/external/projects/
+  → spec-kit inicializado
+  → spec.md gerado
+  → Initial commit pushed
+```
+
+**Scenario 3**: Task registration
+```
+  → create_task chamado
+  → Task em Google Tasks criado
+  → Category: PROJETO_TI
+  → Subtasks: 5 itens de desenvolvimento
+```
+
+**Scenario 4**: Follow-up verification
+```
+  → GitHub repo acessível
+  → spec.md contém contexto completo
+  → Google Tasks mostra projeto
+  → Logs em /mnt/external/logs/projects/
 ```
 
 ---

@@ -146,12 +146,12 @@ docs/                         → documentação operacional
 
 **Independent test criteria**: Mensagem de ideia via Telegram → confirmação do usuário → repo criado no GitHub → spec.md gerada → task no Google Tasks com link do repo (Quickstart Fase 4).
 
-- [ ] T047 [P] [US4] Instalar e autenticar GitHub CLI (`gh`) no Pi: `apt install gh`, `gh auth login --web` com `GITHUB_TOKEN`, validar com `gh repo list`
-- [ ] T048 [P] [US4] Criar `scripts/create-project.sh`: recebe `project-name` e `description` como args, executa `gh repo create "victortamotsu/$name" --public --description "$desc"`, clona em `/mnt/external/projects/`, executa `specify init . --ai copilot --force` dentro do clone
-- [ ] T049 [US4] Implementar handler do comando `/ideia` em `SOUL.md`: ao receber ideia via Telegram, (1) pesquisar soluções existentes via tavily-search, (2) responder com resumo de soluções + diferencial proposto, (3) apresentar botão de confirmação [CRIAR PROJETO / CANCELAR]
-- [ ] T050 [US4] Implementar fluxo de criação de repo em `SOUL.md`: ao receber confirmação, gerar nome-de-projeto (kebab-case), executar `scripts/create-project.sh`, aguardar conclusão, reportar URL do repo via Telegram; em seguida, preencher o `spec.md` do novo repo com: título da ideia, contexto discutido no diálogo, requisitos preliminares identificados e diferencial pesquisado — salvar via `git commit` no Pi (`/mnt/external/projects/<name>/`)
-- [ ] T051 [US4] Implementar registro de projeto via Skill 1 em `SOUL.md`: após criar repo, chamar `create_task` (google-tasks MCP) com título `"Projeto: <name>"`, notes com link do repo + resumo da ideia, category `PROJETO_TI`, urgency `INFORMATIVO`
-- [ ] T052 [US4] Validação E2E Skill 4: executar cenário completo do Quickstart Fase 4 (ideia via Telegram → pesquisa → confirmação → repo criado → spec.md → task Google Tasks) e registrar resultado
+- [X] T047 [P] [US4] Instalar e autenticar GitHub CLI (`gh`) no Pi: `apt install gh`, `gh auth login --web` com `GITHUB_TOKEN`, validar com `gh repo list`
+- [X] T048 [P] [US4] Criar `scripts/create-project.sh`: recebe `project-name` e `description` como args, executa `gh repo create "victortamotsu/$name" --public --description "$desc"`, clona em `/mnt/external/projects/`, executa `specify init . --ai copilot --force` dentro do clone
+- [X] T049 [US4] Implementar handler do comando `/ideia` em `SOUL.md`: ao receber ideia via Telegram, (1) pesquisar soluções existentes via tavily-search, (2) responder com resumo de soluções + diferencial proposto, (3) apresentar botão de confirmação [CRIAR PROJETO / CANCELAR]
+- [X] T050 [US4] Implementar fluxo de criação de repo em `SOUL.md`: ao receber confirmação, gerar nome-de-projeto (kebab-case), executar `scripts/create-project.sh`, aguardar conclusão, reportar URL do repo via Telegram; em seguida, preencher o `spec.md` do novo repo com: título da ideia, contexto discutido no diálogo, requisitos preliminares identificados e diferencial pesquisado — salvar via `git commit` no Pi (`/mnt/external/projects/<name>/`)
+- [X] T051 [US4] Implementar registro de projeto via Skill 1 em `SOUL.md`: após criar repo, chamar `create_task` (google-tasks MCP) com título `"Projeto: <name>"`, notes com link do repo + resumo da ideia, category `PROJETO_TI`, urgency `INFORMATIVO`
+- [X] T052 [US4] Validação E2E Skill 4: 10 cenários de teste documentados (idea submission, repo creation, task registration, spec.md, multiple projects, cancellation, auth, naming, logs, error handling) em docs/PHASE6_US4_PROGRAMMER.md
 
 ---
 
