@@ -1,0 +1,113 @@
+version: "3.8"
+
+services:
+  firefly-iii:
+    # Assumindo que Firefly III já está rodando
+    # Este serviço é referenciado apenas para confirmação
+    container_name: firefly-iii
+    image: fireflyiii/core:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      DB_CONNECTION: sqlite
+      DB_PATH: /data
+      TRUSTED_PROXIES: "**"
+      APP_KEY: ${APP_KEY:-base64:somerandomkeyherefordev}
+    volumes:
+      - ${EXTERNAL_MOUNT:-/mnt/external}/firefly:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - jarvis
+
+  openclaw:
+    image: openclaw/openclaw:latest
+    container_name: openclaw-gateway
+    restart: unless-stopped
+    mem_limit: "1g"
+    environment:
+      - OPENCLAW_MODEL=copilot
+      - OPENCLAW_AGENT_ID=jarvis
+      - OPENCLAW_LOG_LEVEL=info
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REFRESH_TOKEN=${GOOGLE_REFRESH_TOKEN}
+      - FIREFLY_URL=http://firefly-iii:8080
+      - FIREFLY_TOKEN=${FIREFLY_TOKEN}
+    volumes:
+      - ./config/openclaw:/config/openclaw
+      - ${EXTERNAL_MOUNT:-/mnt/external}/openclaw:/data/openclaw
+      - ${EXTERNAL_MOUNT:-/mnt/external}/logs/openclaw:/var/log/openclaw
+    ports:
+      - "127.0.0.1:3000:3000"  # Loopback only
+    depends_on:
+      firefly-iii:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - jarvis
+
+  mcporter:
+    image: steipete/mcporter:latest
+    container_name: mcporter-firefly
+    restart: unless-stopped
+    mem_limit: "128m"
+    environment:
+      - MCPORTER_DEBUG=false
+    volumes:
+      - ./skills/firefly-mcp/mcporter.json:/config/mcporter.json
+    command: mcporter --config /config/mcporter.json
+    depends_on:
+      firefly-iii:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "test", "-f", "/config/mcporter.json"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+    networks:
+      - jarvis
+
+  scheduler:
+    image: alpine:latest
+    container_name: jarvis-scheduler
+    restart: unless-stopped
+    mem_limit: "64m"
+    volumes:
+      - ./config/crontabs:/etc/crontabs
+      - ./scripts:/app/scripts
+      - ${EXTERNAL_MOUNT:-/mnt/external}:/mnt/external
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: >
+      sh -c "
+        apk add --no-cache dcron bash curl git git-crypt &&
+        cp /etc/crontabs/jarvis /var/spool/cron/crontabs/root &&
+        crond -f -l 2
+      "
+    depends_on:
+      openclaw:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "test", "-f", "/var/spool/cron/crontabs/root"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+    networks:
+      - jarvis
+
+networks:
+  jarvis:
+    driver: bridge

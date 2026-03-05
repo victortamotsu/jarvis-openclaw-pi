@@ -1,0 +1,83 @@
+# Node.js / JavaScript / TypeScript
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dist/
+build/
+*.js.map
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Docker
+node_modules/
+.git/
+Dockerfile*
+.dockerignore
+*.log*
+
+# Environment & Secrets
+.env
+.env.local
+.env*.local
+.env.example (tracked)
+
+# Git-crypt (encrypted files)
+*.bin
+*.secret
+
+# Mac / Windows / Linux
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+.vscode/settings.json
+.idea/
+
+# IDE
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.iml
+*.sublime-*
+
+# Logs
+logs/
+*.log
+
+# Temporary
+tmp/
+temp/
+*.bak
+
+# Project-specific
+/mnt/external/
+docker-compose.override.yml
+.env.production
