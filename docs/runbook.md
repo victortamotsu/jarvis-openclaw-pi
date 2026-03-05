@@ -425,17 +425,310 @@ grep "tokens_used" /mnt/external/logs/openclaw/*.log | awk -F: '{sum+=$NF} END {
 
 ---
 
-## Security Checklist
+## Operational Playbooks (Phase 7: T057)
 
-- [ ] `.env` is git-crypt encrypted
-- [ ] `/mnt/external/openclaw/secrets/` has 700 permissions
-- [ ] No credentials in logs (`check /mnt/external/logs/`)
-- [ ] No Docker containers expose ports publicly (只 127.0.0.1:3000)
-- [ ] Tailscale/SSH tunnel for remote access (no direct internet exposure)
-- [ ] Firefly password changed from default
+### 1. Container Restart Playbook
+
+**When to use**: Container crashes, hung process, memory leak
+
+**Single container restart**:
+```bash
+# Restart just OpenClaw
+docker-compose restart openclaw
+
+# Restart Firefly
+docker-compose restart firefly-iii
+
+# Monitor logs while restarting
+docker-compose logs -f openclaw
+```
+
+**Full service restart** (clears all state):
+```bash
+# Graceful shutdown + restart
+docker-compose down
+sleep 10
+docker-compose up -d
+
+# Verify all containers healthy
+docker ps -a
+docker-compose ps
+```
+
+**Force restart** (if containers stuck):
+```bash
+# Kill all containers
+docker-compose kill
+
+# Remove containers (not volumes)
+docker-compose rm -f
+
+# Bring up fresh
+docker-compose up -d
+```
+
+### 2. Backup Restoration Playbook
+
+**Prerequisites**:
+- Know backup date in format `YYYY-WW` (year-week)
+- Backup location: `/mnt/external/backups/YYYY-WW/`
+
+**Restore Firefly III Database**:
+```bash
+BACKUP_DATE="2026-W09"  # Change to desired week
+BACKUP_DIR="/mnt/external/backups/$BACKUP_DATE"
+
+# Check available backups
+ls -la /mnt/external/backups/
+
+# Stop openclaw (it may hold Firefly connections)
+docker-compose stop openclaw
+
+# Find most recent Firefly dump
+FIREFLY_DUMP=$(ls -t "$BACKUP_DIR"/firefly-dump_*.sql | head -1)
+
+# Restore (choose one):
+
+# Option A: Restore from SQL dump
+docker-compose exec firefly-iii sqlite3 /data/firefly.db < "$FIREFLY_DUMP"
+
+# Option B: Restore from tar backup (replaces entire Firefly data)
+tar -xzf "$BACKUP_DIR"/firefly-backup_*.tar.gz -C /mnt/external/
+
+# Restart services
+docker-compose up -d
+
+# Verify Firefly is healthy
+curl http://localhost:8080/ | head -20
+```
+
+**Restore OpenClaw Configuration**:
+```bash
+BACKUP_DATE="2026-W09"
+BACKUP_DIR="/mnt/external/backups/$BACKUP_DATE"
+
+# Extract backup to temporary location
+mkdir -p /tmp/openclaw-restore
+tar -xzf "$BACKUP_DIR"/openclaw-backup_*.tar.gz -C /tmp/openclaw-restore
+
+# Review what will be restored
+ls -la /tmp/openclaw-restore/openclaw/
+
+# Backup current configuration first
+cp -r /mnt/external/openclaw /mnt/external/openclaw.backup.$(date +%s)
+
+# Restore (selective restoration recommended)
+# Option: Copy specific files only
+cp /tmp/openclaw-restore/openclaw/memory/*.json \
+   /mnt/external/openclaw/memory/
+
+# Restart openclaw with restored config
+docker-compose restart openclaw
+
+# Verify logs for errors
+docker-compose logs openclaw | tail -50
+```
+
+### 3. OAuth Token Renewal Playbook
+
+**When needed**: Token expiration, permission revocation, re-authentication
+
+**Google OAuth tokens** (Google Drive, Gmail, Google Tasks):
+```bash
+# Clear cached tokens (forces re-auth)
+rm -f /mnt/external/openclaw/tokens/google_*
+
+# Restart OpenClaw (will trigger OAuth flow)
+docker-compose restart openclaw
+
+# Verify new token obtained
+ls -la /mnt/external/openclaw/tokens/
+
+# Monitor logs for auth success
+docker-compose logs openclaw | grep -i "oauth\|auth\|token"
+```
+
+**Firefly Bearer Token Renewal**:
+```bash
+# If using Firefly self-hosted, regenerate API token:
+# 1. SSH into Pi
+# 2. Access Firefly UI: http://localhost:8080/
+# 3. Admin → Settings → Personal Access Tokens
+# 4. Revoke old token, create new one
+# 5. Update .env file:
+export FIREFLY_TOKEN="new_token_here"
+
+# Restart OpenClaw to use new token
+docker-compose restart openclaw
+
+# Test connection
+docker-compose exec openclaw curl -H "Authorization: Bearer $FIREFLY_TOKEN" \
+  http://firefly-iii:8080/api/v1/about
+```
+
+**GitHub Token Renewal**:
+```bash
+# On Pi, regenerate token via GitHub CLI
+gh auth refresh
+
+# Or revoke and create new token:
+# 1. Go to github.com/settings/tokens
+# 2. Click "Regenerate token" on existing token
+# 3. Copy new token
+# 4. Update .env:
+export GITHUB_TOKEN="ghp_new_token_here"
+
+# Restart OpenClaw
+docker-compose restart openclaw
+
+# Test with gh CLI
+gh repo list
+```
+
+### 4. WhatsApp Re-pairing Playbook (Extended)
+
+**When to use**: WhatsApp logs out, device session expires, need to re-scan
+
+**Full re-pairing process**:
+```bash
+# 1. Trigger re-pairing from Telegram
+# Send command to Jarvis: /whatsapp-reset
+
+# 2. Monitor terminal for QR code
+docker-compose logs -f openclaw | grep -i "qr\|scan"
+
+# 3. On your phone:
+#    - Open WhatsApp
+#    - Settings → Linked Devices
+#    - Scan QR code shown in logs
+
+# 4. Verify connection established
+docker-compose logs openclaw | grep -i "connected\|authenticated"
+
+# 5. Test message
+# Send test message from your WhatsApp to Jarvis number
+# Verify it appears in OpenClaw logs
+
+# 6. Re-configure contacts (if needed)
+# Edit config/openclaw/agents/jarvis/SOUL.md
+# Update WhatsApp contact mappings
+```
+
+**Troubleshooting WhatsApp**:
+```bash
+# Clear WhatsApp session
+docker-compose exec openclaw \
+  rm -rf /data/openclaw/whatsapp-session
+
+# Restart OpenClaw
+docker-compose restart openclaw
+
+# Monitor new pairing
+docker-compose logs -f openclaw
+```
+
+### 5. Logging & Diagnostics Playbook
+
+**View all logs in real-time**:
+```bash
+# Follow OpenClaw logs
+docker-compose logs -f openclaw
+
+# Follow with timestamp + last 50 lines
+docker-compose logs -f --timestamps openclaw | tail -100
+
+# View all service logs (multiplexed)
+docker-compose logs -f
+```
+
+**Parse structured logs from scripts**:
+```bash
+# View import script logs
+cat /mnt/external/logs/import-statement/$(date +%Y-%m-%d).log
+
+# View travel search logs
+cat /mnt/external/logs/travel-search/$(date +%Y-%m-%d).log
+
+# View health check logs
+cat /mnt/external/logs/health-check/$(date +%Y-%m-%d).log
+
+# Search for errors across all logs
+grep -r "ERROR" /mnt/external/logs/ --include="*.log" |
+  sort -r | head -20
+```
+
+**Check disk space usage**:
+```bash
+# Overall disk usage
+df -h /mnt/external/
+
+# Largest log files
+du -sh /mnt/external/logs/* | sort -hr | head -10
+
+# Backup size
+du -sh /mnt/external/backups/
+
+# Suggest cleanup if needed
+find /mnt/external/logs -name "*.log" -mtime +90 -delete
+```
+
+### 6. Recovery/Uptime Testing Playbook
+
+**T058: Monthly recovery test** (first Monday 2am):
+```bash
+# 1. Simulate container failure
+docker-compose pause openclaw
+sleep 5
+
+# 2. Restart (should be automatic via restart: unless-stopped)
+docker-compose unpause openclaw
+
+# 3. Verify recovery
+docker-compose ps
+docker-compose logs openclaw | tail -20
+
+# 4. Check health endpoint
+curl -v http://127.0.0.1:3000/health
+
+# 5. Send test message via Telegram
+# Command: /status
+# Expected: ✅ All services healthy
+
+# 6. Log test result
+echo "Recovery test [$(date '+%Y-%m-%d %H:%M')] PASSED" >> /mnt/external/logs/recovery-tests.log
+```
+
+**Container restart verification**:
+```bash
+# Check if restart policy is active
+docker inspect openclaw-gateway | grep -i "restart"
+
+# Expected output:
+# "RestartPolicy": {"Name": "unless-stopped", ...}
+
+# Force test: stop container, verify auto-restart
+docker stop openclaw-gateway
+sleep 10
+docker ps | grep openclaw-gateway  # Should show as running
+
+# If container doesn't restart automatically, fix docker-compose.yml
+# Ensure: restart: unless-stopped
+```
 
 ---
 
-**End of Runbook — Phase 1**
+## Security & Compliance Checklist (Phase 7)
 
-Next sections added after Phase 2 completion (T016).
+- [ ] Logs are being rotated weekly (check `/mnt/external/logs/*/`)
+- [ ] Backups execute weekly (check `/mnt/external/backups/YYYY-WW/`)
+- [ ] Health checks run every 5 minutes (check crontab)
+- [ ] No PII logged (grep credentials/passwords in logs)
+- [ ] git-crypt protecting `.env` file
+- [ ] All containers use `restart: unless-stopped`
+- [ ] Token expiration dates tracked (renewals scheduled quarterly)
+
+---
+
+**Runbook Status**: COMPLETE (Phase 7)  
+**Last Updated**: 2026-03-04  
+**Sections**: Initial Setup, Container Management, OAuth, Operations, Backup/Recovery, WhatsApp, Diagnostics, Recovery Testing

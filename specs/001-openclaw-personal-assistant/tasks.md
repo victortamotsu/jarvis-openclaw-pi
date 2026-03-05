@@ -159,14 +159,14 @@ docs/                         → documentação operacional
 
 **Purpose**: Logging (Art. VI.4), backup, otimização de tokens, documentação operacional, validação de recovery.
 
-- [ ] T053 [P] Implementar logging estruturado em todos os scripts bash (`scripts/*.sh`): redirecionar stdout/stderr para `/mnt/external/logs/{script-name}/YYYY-MM-DD.log` com timestamps
-- [ ] T054 [P] Criar `config/logrotate.conf` e registrar no `docker-compose.yml` scheduler: rotação semanal, compressão gzip, retenção 90 dias (Art. VI.4 — fecha gap do Constitution Check)
-- [ ] T064 [P] Criar `scripts/health-check.sh`: verificar via `docker ps --filter name=openclaw --filter name=firefly --filter name=scheduler` se todos os containers esperados estão `Up`; se ausente, alertar via Telegram (curl direto `https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage` com `$TELEGRAM_CHAT_ID`); adicionar entrada `*/5 * * * *` em `config/crontabs/jarvis` (Art. VIII.1)
-- [ ] T055 [P] Criar script de backup semanal em `config/crontabs/jarvis`: `0 3 * * 0` → dump SQLite do Firefly + tar do `/mnt/external/openclaw/` → salvar em `/mnt/external/backups/YYYY-WW/`
-- [ ] T056 Otimizar prompts em `config/openclaw/agents/jarvis/SOUL.md` por tipo de tarefa: prompt compacto para classificação (~200 tokens), prompt médio para extração (~500 tokens), prompt completo para análise (~1500 tokens) (Art. I §1.4)
-- [ ] T065 [P] Implementar rastreamento semanal de métricas de tokens e custo em `SOUL.md`: no relatório semanal, incluir contagem de chamadas ao Copilot e tokens estimados consumidos no período (parseados dos logs em `/mnt/external/logs/openclaw/`); adicionar coluna "Custo tokens (estimado)" ao relatório financeiro mensal (Art. VIII.3)
-- [ ] T057 [P] Completar `docs/runbook.md`: adicionar playbooks de restart de container, restore de backup, re-pairing do WhatsApp, revogação/renovação de tokens OAuth
-- [ ] T058 Executar teste de recovery: parar container `openclaw` manualmente → verificar restart automático via `restart: unless-stopped` → confirmar uptime via `docker ps`
+- [X] T053 [P] Implementar logging estruturado em todos os scripts bash (`scripts/*.sh`): redirecionar stdout/stderr para `/mnt/external/logs/{script-name}/YYYY-MM-DD.log` com timestamps
+- [X] T054 [P] Criar `config/logrotate.conf` e registrar no `docker-compose.yml` scheduler: rotação semanal, compressão gzip, retenção 90 dias (Art. VI.4 — fecha gap do Constitution Check)
+- [X] T064 [P] Criar `scripts/health-check.sh`: verificar via `docker ps --filter name=openclaw --filter name=firefly --filter name=scheduler` se todos os containers esperados estão `Up`; se ausente, alertar via Telegram (curl direto `https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage` com `$TELEGRAM_CHAT_ID`); adicionar entrada `*/5 * * * *` em `config/crontabs/jarvis` (Art. VIII.1)
+- [X] T055 [P] Criar script de backup semanal em `config/crontabs/jarvis`: `0 3 * * 0` → dump SQLite do Firefly + tar do `/mnt/external/openclaw/` → salvar em `/mnt/external/backups/YYYY-WW/`
+- [X] T056 Otimizar prompts em `config/openclaw/agents/jarvis/SOUL.md` por tipo de tarefa: prompt compacto para classificação (~200 tokens), prompt médio para extração (~500 tokens), prompt completo para análise (~1500 tokens) (Art. I §1.4)
+- [X] T065 [P] Implementar rastreamento semanal de métricas de tokens e custo em `SOUL.md`: no relatório semanal, incluir contagem de chamadas ao Copilot e tokens estimados consumidos no período (parseados dos logs em `/mnt/external/logs/openclaw/`); adicionar coluna "Custo tokens (estimado)" ao relatório financeiro mensal (Art. VIII.3)
+- [X] T057 [P] Completar `docs/runbook.md`: adicionar playbooks de restart de container, restore de backup, re-pairing do WhatsApp, revogação/renovação de tokens OAuth
+- [X] T058 Executar teste de recovery: parar container `openclaw` manualmente → verificar restart automático via `restart: unless-stopped` → confirmar uptime via `docker ps`
 - [ ] T059 Commit e push de todos os artefatos de implementação para o repositório GitHub `victortamotsu/jarvis-openclaw-pi`
 
 ---

@@ -49,13 +49,19 @@
 0 7 * * * docker-compose -f /home/pi/jarvis-openclaw-pi/docker-compose.yml exec -T openclaw openclaw agent --message "Verificar deals de viagem para buscas ativas em travel-params.json. Alertar se encontrar dentro do orçamento com tabela comparativa se >=2 resultados. Criar task em Google Tasks para cada deal com deadline 48h." --max-tokens 2000 >> /mnt/external/logs/openclaw/travel-deals.log 2>&1
 
 # ─────────────────────────────────────────────────────────────────────
-# System Maintenance
+# System Maintenance (Phase 7: Logging & Operations)
 # ─────────────────────────────────────────────────────────────────────
 
-# Health check: ping gateway every 30 minutes
-*/30 * * * * curl -s http://127.0.0.1:3000/health > /dev/null 2>&1 || echo "Health check failed" >> /mnt/external/logs/openclaw/health.log
+# T064: Docker container health monitoring every 5 minutes
+# Checks if openclaw, firefly, scheduler containers are running and alerts if down
+*/5 * * * * /home/pi/jarvis-openclaw-pi/scripts/health-check.sh >> /mnt/external/logs/health-check/cron.log 2>&1
 
-# Logrotate daily at 2am
+# T055: Weekly backup at 3am on Sunday
+# Creates dumps of Firefly DB + tar of /mnt/external/openclaw/ directory
+0 3 * * 0 /home/pi/jarvis-openclaw-pi/scripts/backup.sh >> /mnt/external/logs/backup/cron.log 2>&1
+
+# Logrotate daily at 2am (ensures logs don't consume all disk space)
+# Runs weekly rotation, gzip compression, 90-day retention per config/logrotate.conf
 0 2 * * * /usr/sbin/logrotate /home/pi/jarvis-openclaw-pi/config/logrotate.conf >> /mnt/external/logs/openclaw/cron.log 2>&1
 
 # ─────────────────────────────────────────────────────────────────────
