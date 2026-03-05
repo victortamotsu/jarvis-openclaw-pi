@@ -51,7 +51,7 @@ Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando
 - [ ] Tasks possuem: título, notas contextuais, lista de tarefas (task list), sub-tasks de ações, data de vencimento
 - [ ] Deduplicação: busca por task existente antes de criar nova (match por assunto + contato)
 - [ ] Updates em tasks existentes incluem timestamp e resumo da atualização nas notas
-- [ ] Classificação de urgência: INFORMATIVO / AÇÃO NECESSÁRIA / URGENTE / CRÍTICO
+- [ ] Classificação de urgência: INFORMATIVO / AÇÃO_NECESSARIA / URGENTE / CRÍTICO *(em código e JSON: sem acento, com underscore — `ACAO_NECESSARIA`)*
 - [ ] URGENTE e CRÍTICO geram alerta imediato via **Telegram**
 - [ ] Sugestões de resposta geradas sob demanda via comando `/responder <task_id>` no Telegram: busca contexto da task, pesquisa web via Tavily se necessário, retorna 2–3 opções de resposta formatadas
 - [ ] Agente encerra tasks automaticamente ao detectar mensagem de confirmação/encerramento ("ok, feito", "resolvido", "confirmado") vinculada a task aberta no canal original
@@ -90,7 +90,7 @@ Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando
 
 **US-3.1**: Como Victor, quero informar períodos de interesse (férias, feriados) e destinos favoritos (Orlando, NYC, Disney, Londres, Paris, Roma) para que o agente monitore oportunidades.
 
-**US-3.2**: Como Victor, quero que o agente analise emails promocionais e grupos de viagens em busca de deals para que eu não perca ofertas.
+**US-3.2**: Como Victor, quero que o agente analise emails promocionais e grupos do WhatsApp de viagens em busca de deals para que eu não perca ofertas. *(Grupos WhatsApp monitorados passivamente via skill `openclaw-whatsapp`, mesmo mecanismo da Skill 1 — sem envio de mensagens. Grupos Telegram e RSS de promoções de voos são lidos via keywords de viagem no monitor de emails/mensagens da Skill 1.)*
 
 **US-3.3**: Como Victor, quero que o agente pesquise passagens aéreas e hospedagem para 4 pessoas nos períodos informados para encontrar os melhores preços.
 
@@ -339,7 +339,7 @@ Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando
 ### Fase 5 — Integração e Polimento (Semana 9-10)
 - Cross-skill communication refinada
 - Otimização de tokens/prompts
-- PDF parsing no Pi (pdfplumber)
+- PDF parsing via `@sylphx/pdf-reader-mcp` (já em uso desde Fase 2; esta fase foca em otimização de performance no Pi)
 - Dashboard web (OPP-3) se viável
 - Documentação e automação de recovery
 
