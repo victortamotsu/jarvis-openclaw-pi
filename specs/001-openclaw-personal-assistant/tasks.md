@@ -167,7 +167,7 @@ docs/                         → documentação operacional
 - [X] T065 [P] Implementar rastreamento semanal de métricas de tokens e custo em `SOUL.md`: no relatório semanal, incluir contagem de chamadas ao Copilot e tokens estimados consumidos no período (parseados dos logs em `/mnt/external/logs/openclaw/`); adicionar coluna "Custo tokens (estimado)" ao relatório financeiro mensal (Art. VIII.3)
 - [X] T057 [P] Completar `docs/runbook.md`: adicionar playbooks de restart de container, restore de backup, re-pairing do WhatsApp, revogação/renovação de tokens OAuth
 - [X] T058 Executar teste de recovery: parar container `openclaw` manualmente → verificar restart automático via `restart: unless-stopped` → confirmar uptime via `docker ps`
-- [ ] T059 Commit e push de todos os artefatos de implementação para o repositório GitHub `victortamotsu/jarvis-openclaw-pi`
+- [X] T059 Commit e push de todos os artefatos de implementação para o repositório GitHub `victortamotsu/jarvis-openclaw-pi`
 
 ---
 
