@@ -153,7 +153,388 @@ Use estes níveis EXATAMENTE (em código: sem acento, com underscore):
 - Análise de investimentos (CDB, Tesouro, fundos)
 - Alertas de limite de gasto
 
-### Fluxo `/importar`
+### T034: Handler `/importar` 
+
+**Comando**: `/importar` via Telegram
+
+**Algoritmo**:
+```
+1. Victor envia: /importar
+2. Resposta: "Procurando seu arquivo de importação..."
+3. Buscar Google Drive pasta "Jarvis/imports/":
+   - Encontrar arquivo mais recente (.csv, .pdf, ou .zip com ambos)
+4. Download para temp location
+5. Executar: bash scripts/import-statement.sh <csv> <pdf>
+6. Monitorar 5 estágios:
+   - Stage 1: PDF parsing (extrair transações)
+   - Stage 2: CSV enrichment (merge com banco)
+   - Stage 3: Anonymization (de nomes + valores)
+   - Stage 4: Firefly import (POST API)
+   - Stage 5: Telegram notification (resultado)
+7. Sucesso:
+   - Alert: "✅ X transações importadas em Y segundos"
+   - Log em /mnt/external/logs/imports/YYYY-MM-DD.log
+   - Criar task "Verificar importação" com due_date hoje+1
+8. Erro:
+   - Alert CRITICO: "❌ Import falhou: [razão específica]"
+   - Anexar erro + sugestão (retry / enviar arquivo específico)
+```
+
+**Formato de resposta**:
+```
+✅ Importação Concluída
+
+📊 Resumo:
+  • Transações: 47 inseridas
+  • Titulares: MEMBER_A (23), MEMBER_B (24)
+  • Período: 2026-02-20 a 2026-03-04
+  • Categorias: 8
+  • Duplicatas ignoradas: 2
+  • Erros: 0
+
+💾 Arquivo: /mnt/external/logs/imports/2026-03-04.json
+```
+
+### T035: Owner Rules Learning (Aprendizado de Titulares)
+
+**Trigger**: Transação com `owner_confidence = "MANUAL_REQUIRED"`
+
+**Algoritmo**:
+```
+1. Durante import (T033), identificar ambiguidades
+2. Caso: "Amazon R$250" sem titular claro
+3. Enviar Telegram: "🤔 Quem pagou Amazon R$250? A/ B/ C/ D/ Outro?"
+4. Victor responde com: Número (1-5) ou nome
+5. Ações:
+   a) Salvar em /mnt/external/openclaw/memory/owner-rules.json:
+      {"AMAZON": "MEMBER_A"}
+   b) Log: "[2026-03-04 14:30] Aprendido: Amazon → MEMBER_A"
+   c) Marcar transação com owner confirmado
+6. Resposta: "✓ Amazon → Victor. Próximas vezes automático!"
+7. Futuras transações Amazon:
+   - Automaticamente marcadas com MEMBER_A
+   - Confidence: HIGH (sem revisão)
+```
+
+**Fuzzy Matching**: Se match for parcial (ex: "AMAZON LOJA 1234"):
+- Procurar owner-rules com prefixo ("AMAZON")
+- Usar regra se confiança > 0.7
+
+**Exemplo Timeline**:
+```
+[Dia 1, 14:30] PDF traz: "UBER R$150"
+Pipeline: ambíguo, pergunta via Telegram
+Victor: "B"
+→ owner-rules.json: {"UBER": "MEMBER_B"}
+→ Telegram: "✓ Uber → Spouse. Próximas vezes automático!"
+
+[Dia 3, 10:00] Novo import: "UBER R$120"
+Pipeline: regex encontra "UBER" em owner-rules
+→ Automático: owner = "MEMBER_B", confidence = "HIGH"
+→ Sem pergunta
+```
+
+### T036: Monthly Report & Task Creation
+
+**Trigger**: Cron `0 9 5 * *` (dia 5 a cada mês, 9 AM)
+
+**Algoritmo**:
+```
+1. Query Firefly API:
+   - Data: 1º a último dia do mês anterior
+   - GET /transactions, relação por categoria
+2. Calcular:
+   - Total gasto 
+   - Breakdown por categoria
+   - Breakdown por membro (MEMBER_A, B, C, D)
+   - Percentual vs cota mensal por membro
+3. Gerar Markdown:
+   ```
+   # Gastos — [Mês/Ano]
+   
+   ## 📊 Resumo
+   - Total: R$ X.XXX
+   - Categorias: Y
+   
+   ## 💳 Por Categoria
+   | Categoria | Gasto | % do Total |
+   | --- | --- | --- |
+   | Alimentação | R$1,200 | 26% |
+   | Transporte | R$800 | 18% |
+   ...
+   
+   ## 👥 Por Membro
+   | Membro | Limite | Gasto | % | Status |
+   | --- | --- | --- | --- | --- |
+   | MEMBER_A | R$2.500 | R$2.100 | 84% | ⚠️ |
+   | MEMBER_B | R$3.000 | R$2.400 | 80% | ⚠️ |
+   
+   ## ⚠️ Alertas
+   ⚠️ MEMBER_A em 84% da cota (restam R$400)
+   ⚠️ MEMBER_B em 80% da cota (restam R$600)
+   ```
+4. Upload Google Drive:
+   - Criar: "Jarvis/relatorios/[YYYY-MM]-gastos.md"
+   - Also: "[YYYY-MM]-gastos.csv"
+5. Send Telegram:
+   - Markdown com resumo + link Drive
+6. Criar task:
+   - Title: "Exportar faturas do próximo mês"
+   - Due: 1º dia do mês seguinte
+   - Category: FINANCEIRO
+   - Urgency: INFORMATIVO
+   - Subtasks:
+     ☐ Baixar fatura banco
+     ☐ Baixar fatura cartão
+     ☐ Enviar para /importar
+7. Email cônjuge (se vinculado):
+   - Subject: "Gastos — [Mês]"
+   - Corpo: resumo + link arquivo completo
+```
+
+**Formato Telegram**:
+```
+📊 Gastos — Março 2026
+
+**Total**: R$ 4.500
+
+**Top Categorias**:
+  1. 🍽️ Alimentação: R$1.200 (26%)
+  2. 🚗 Transporte: R$800 (18%)
+  3. 📚 Educação: R$800 (18%)
+
+**Por Membro**:
+  👨 MEMBER_A: R$2.100 / R$2.500 (84%) ⚠️
+  👩 MEMBER_B: R$2.400 / R$3.000 (80%) ⚠️
+
+📎 [Relatório Completo](link-drive)
+```
+
+### T037: Spending Quota Alerts
+
+**Arquivo Config**: `/mnt/external/openclaw/memory/quota-rules.json`
+
+```json
+{
+  "members": {
+    "MEMBER_A": {
+      "monthly_limit": 2500,
+      "current_spent": 0,
+      "reset_date": "2026-04-01",
+      "alert_threshold": 0.80
+    },
+    "MEMBER_B": {
+      "monthly_limit": 3000,
+      "current_spent": 0,
+      "reset_date": "2026-04-01",
+      "alert_threshold": 0.80
+    }
+  }
+}
+```
+
+**Trigger**: Durante import (T032), após cada transação adicionada
+
+**Algoritmo**:
+```
+1. Nova transação importada: amount=R$500, owner="MEMBER_A"
+2. Carregar quota-rules.json
+3. Calcular:
+   - Novo spent: 2100 + 500 = 2600
+   - % utilizado: 2600 / 2500 = 104%
+   - Status: OVER -> alerta CRITICO
+4. Verificar limiares:
+   - Se 80% ≤ spent < 100%: URGENTE
+   - Se spent ≥ 100%: CRITICO
+5. Enviar Telegram:
+   - Urgency apropriada
+   - Formato: "⚠️ Cota [MEMBER_A] agora em 104% (R$2600/R$2500)"
+6. Fazer update em quota-rules.json
+7. Log em /mnt/external/logs/quota-alerts.json:
+   ```json
+   {
+     "timestamp": "2026-03-04T14:30:00",
+     "member": "MEMBER_A",
+     "alert_type": "CRITICO",
+     "spent": 2600,
+     "limit": 2500,
+     "percentage": 104,
+     "transaction_value": 500,
+     "transaction_id": "12345"
+   }
+   ```
+8. **Auto-reset** no dia reset_date meia-noite (via cron):
+   - Zerar current_spent → 0
+   - Resetar reset_date → +1 mês
+   - Send telegram: "✓ Cotas resetadas para próximo mês"
+```
+
+**Telegram Alerts**:
+| Scenario | Message |
+|----------|---------|
+| 80-89% | ⚠️ Cota [MEMBER_A] em 85% (R$2.125/R$2.500) |
+| 90-99% | ⚠️ ATENÇÃO: Cota [MEMBER_A] em 98% (R$2.450/R$2.500) |
+| 100%+ | 🚨 CRÍTICO: Cota estourada [MEMBER_A] (R$2.600/R$2.500) |
+
+### T062: Análise de Investimentos (Investment Analysis)
+
+**Trigger**: Mensagem contendo "CDB", "Tesouro", "LCI", "LCA", "investimento", "fundo", "aplicação"
+
+**Algoritmo**:
+```
+1. Detectar pergunta sobre investimento
+   Ex: "E CDB agora? Vale a pena?"
+2. Extrair parâmetros contextuais (se presentes):
+   - Tipo de produto (CDB, Tesouro, LCI, etc)
+   - Horizonte temporal (se mencionado)
+   - Perfil de risco (conservador, moderado, agressivo)
+3. Pesquisar Tavily:
+   - Query 1: "CDB rates Brazil 2026 current"
+   - Query 2: "Tesouro Direto current rates 2026"
+   - Query 3: "SELIC rate Brazil"
+4. ParseResult: Compilar tabela comparativa
+   ```
+   | Produto | Taxa | Vencimento | Liquidez | Risco |
+   | --- | --- | --- | --- | --- |
+   | Tesouro SELIC | 10.5% | On-demand | Imediata | Mínimo |
+   | CDB | 11.5% | 12 meses | Alta | Baixo |
+   | LCI | 10.8% | 12 meses | Baixa | Baixo |
+   | Fundo | 10.2% | Variável | Variável | Moderado |
+   ```
+5. **SEGURANÇA: NUNCA revelar**:
+   - Investimentos atuais de Victor
+   - Valores exatos das aplicações
+   - Portfolio details
+6. Formatar Telegram response:
+   ```
+   💼 Análise de Investimentos
+   
+   | Produto | Taxa | Liquidez | Melhor Para |
+   | Tesouro SELIC | 10.5% | Imediata | Segurança + liquidez |
+   | CDB | 11.5% | Alta | Retorno maior |
+   | LCI | 10.8% | Média | Isenção fiscal |
+   
+   ⚠️ Não há relação com seus investimentos atuais.
+   🔗 Consulte um advisor para decisão pessoal.
+   ```
+7. Log analysis:
+   - Save em /mnt/external/logs/investment-analyses.json
+   - Include: timestamp, query, results, user_context (anonymized)
+```
+
+**Security Rules**:
+- ✅ Compartilhar taxas públicas
+- ✅ Compartilhar SELIC, inflação, índices
+- ✅ Comparações genéricas de produtos
+- ❌ Nunca: "Seus investimentos em CDB estão em..."
+- ❌ Nunca: Revelar valores de aplicações pessoais
+- ❌ Nunca: Dar recomendação direta sem disclaimer
+
+**Exemplo Interaction**:
+```
+Victor: "CDB ou Tesouro agora? SELIC caiu bastante"
+Jarvis: [Tavily search]
+Resposta:
+  
+📊 Comparação Atual (SELIC 10.5%)
+
+| Produto | Taxa | Risco |
+| Tesouro SELIC | 10.5% | Mínimo |
+| CDB | 11.5% | Baixo |
+| LCI | 10.8% | Baixo |
+
+💡 CDB tende a pagar mais que Tesouro quando SELIC está mais alta.
+   LCI oferece vantagem fiscal mas menor liquidez.
+
+⚠️ Fale com seu advisor considerando seu perfil.
+```
+
+### T063: Yield Importer (Investment Income)
+
+**Trigger**: Usuário envia PDF de "Informe de Rendimentos" ou "Comprovante de Rendimento"
+
+**Algoritmo**:
+```
+1. Receber PDF (Telegram attachment)
+2. Chamar pdf_parser.py (similar a T029):
+   - Extrair texto do PDF
+   - Buscar padrões de rendimento:
+     - "Instituição: [BANCO]"
+     - "Produto: [CDB/LCI/Fundo/...]"
+     - "Rendimento Bruto: R$ X"
+     - "IR Retido: R$ Y"
+     - "Rendimento Líquido: R$ Z"
+3. Parse por produto:
+   ```json
+   [
+     {
+       "institution": "Banco Brasil",
+       "product_type": "CDB",
+       "gross": 1500,
+       "tax_retained": 225,
+       "net": 1275
+     },
+     {
+       "institution": "Caixa",
+       "product_type": "LCI",
+       "gross": 800,
+       "tax_retained": 0,
+       "net": 800
+     }
+   ]
+   ```
+4. Anonimizar via anonymizer.py (T031):
+   - Guardar product_type (útil para análise)
+   - Mascarar valores: LOW/MED/HIGH brackets
+5. Criar transações em Firefly como "Investment Income":
+   ```
+   Type: Deposit
+   Category: Investment Income
+   Amount: [MASKED - não enviar exato]
+   Description: "[CDB] Banco Brasil rendimento"
+   Tags: ["investment", "income", "product_type"]
+   Date: data do PDF
+   ```
+6. Gerar relatório consolidado:
+   ```
+   # Rendimentos de Investimentos — 2026
+   
+   | Instituição | Produto | Rendimento Bruto | IR | Rendimento Líquido |
+   | --- | --- | --- | --- | --- |
+   | Banco Brasil | CDB | [MED] | [LOW] | [MED] |
+   | Caixa | LCI | [MED] | 0 | [MED] |
+   | **Total** | | [HIGH] | [LOW] | [MED] |
+   ```
+7. Upload Google Drive:
+   - Criar: "Jarvis/relatorios/rendimentos-2026.md"
+8. Send Telegram:
+   - Resumo consolidado
+   - Link para arquivo completo
+9. Criar task reminder:
+   - Title: "Declarar rendimentos Imposto de Renda"
+   - Due: 30 dias antes do deadline IRPF
+   - Category: FINANCEIRO
+10. Log em /mnt/external/logs/yield-imports.json
+```
+
+**Telegram Response**:
+```
+💰 Rendimentos Importados
+
+📊 **Resumo 2026**:
+  • Total Bruto: R$ [MED]
+  • IR Retido: R$ [LOW]
+  • Total Líquido: R$ [MED]
+
+📋 **Por Produto**:
+  1. CDB (Banco Brasil): [MED]
+  2. LCI (Caixa): [MED]
+
+📎 Relatório completo salvo em Drive.
+⏰ Reminder criada: "Declarar rendimentos IRPF"
+```
+
+### Fluxo Principal `/importar` (Resumido)
 
 ```
 /importar (Telegram)
@@ -171,35 +552,20 @@ Categorizar (via Copilot) → mapeamento Firefly
 Importar Firefly (REST API)
   ↓
 Confirmar via Telegram (X transações importadas, Y titulares)
+  ↓
+Atualizar quota-rules.json + alertar se necessário
 ```
 
-### Regras de Titular
+### Regras de Titular (Backup Reference)
 
 - Armazenadas em `/mnt/external/openclaw/memory/owner-rules.json`
 - Formato: `{"ESTABELECIMENTO": "member_id"}`
 - Exemplos: `{"CARREFOUR": "MEMBER_A", "UBER": "MEMBER_B"}`
 
-**Aprendizado**: Ao categorizar transação ambígua:
-1. Perguntar Victor via Telegram: "Transação Uber R$150 — quem pagou?"
-2. Salvar resposta em `owner-rules.json`
-3. Usar próximas vezes
-
-### Alertas de Cota
+### Alertas de Cota (Backup Reference)
 
 - Verificar `/mnt/external/openclaw/memory/quota-rules.json`
-- Formato: `{"MEMBER_A": {"monthly_limit": 5000, "current_spent": 3500}}`
-
-Alertar:
-- 80% da cota: `URGENTE` "Cota [MEMBER] em 80%: R$4000/R$5000"
-- 100% ou acima: `CRITICO` "⚠️ COTA ESTOURADA [MEMBER]: R$5200/R$5000"
-
-### Análise de Investimentos (T062)
-
-Ao receber pergunta sobre "CDB", "Tesouro", "LCI", "LCA", "fundos":
-1. Pesquisar taxas atuais + SELIC (Tavily)
-2. Formatar análise: Produto | Taxa atual | Vencimento | Rentabilidade
-3. **NUNCA** enviar valores de investimento do Victor ao Copilot sem anonimizar
-4. Responder via Telegram com análise formatada
+- Alertar: 80% → `URGENTE`, 100%+ → `CRITICO`
 
 ---
 

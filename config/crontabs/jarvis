@@ -21,8 +21,20 @@
 0 9 5 * * /home/pi/jarvis-openclaw-pi/scripts/monthly-report.sh >> /mnt/external/logs/openclaw/cron.log 2>&1
 
 # ─────────────────────────────────────────────────────────────────────
-# Skill 2: Gestor Financeiro (planned Phase 4)
+# Skill 2: Gestor Financeiro (Phase 4)
 # ─────────────────────────────────────────────────────────────────────
+
+# T036: Monthly financial report on 5th at 9am
+# (Generate spending summary, upload to Drive, email spouse, create reminder)
+0 9 5 * * /home/pi/jarvis-openclaw-pi/scripts/monthly-report.sh >> /mnt/external/logs/openclaw/monthly-report.log 2>&1
+
+# T037: Auto-reset quotas on 1st of month at 00:05
+# (Reset member spending counters, alert via Telegram)
+5 0 1 * * docker-compose -f /home/pi/jarvis-openclaw-pi/docker-compose.yml exec -T openclaw openclaw agent --message "Resetar cotas de gastos do novo mês em quota-rules.json. Enviar confirmação via Telegram." >> /mnt/external/logs/openclaw/cron.log 2>&1
+
+# T035: Backup owner-rules and quota-rules daily at 3am
+# (Persist learning, prepare for recovery)
+0 3 * * * tar -czf /mnt/external/backups/memory-backup-$(date +\%Y\%m\%d).tar.gz /mnt/external/openclaw/memory/*.json >> /mnt/external/logs/openclaw/cron.log 2>&1
 
 # Import reminder on last day of month at 8am
 # (Remind to import previous month's statement before new month starts)
