@@ -65,15 +65,15 @@ docs/                         → documentação operacional
 
 **⚠️ CRÍTICO**: Nenhuma skill pode ser implementada até esta fase estar completa e validada.
 
-- [ ] T008 Criar `config/openclaw/openclaw.json` configurando: modelo exclusivo GitHub Copilot, Telegram como canal primário (long polling, sem webhook), e lista de skills a serem carregadas
-- [ ] T009 Criar `scripts/setup-pi.sh` cobrindo: verificação de Docker, criação de `/mnt/external/{openclaw,openclaw/memory,logs,backups,firefly}`, permissões, montagem de disco externo
-- [ ] T010 [P] Configurar logging centralizado: criar estrutura `/mnt/external/logs/{openclaw,firefly,scheduler}/` e arquivo `config/logrotate.conf` com rotação semanal e retenção de 90 dias (Art. VI.4)
-- [ ] T011 Configurar Telegram Bot: registrar bot via BotFather, obter `TELEGRAM_BOT_TOKEN` e `TELEGRAM_CHAT_ID`, adicionar ao `.env`, validar com `curl https://api.telegram.org/bot$TOKEN/getMe`
-- [ ] T012 Subir e validar OpenClaw Gateway: `docker compose up openclaw -d`, executar `openclaw agent --message "ping"` e confirmar resposta do Copilot (Quickstart 0.1, 0.2)
-- [ ] T013 Validar Telegram Bot integrado ao OpenClaw: enviar mensagem de texto ao bot e confirmar que o agente responde via Telegram (Quickstart 0.3)
-- [ ] T014 Configurar Google OAuth 2.0: criar credenciais OAuth no Google Cloud Console com scopes `gmail.readonly`, `tasks`, `drive.file`; executar fluxo de autorização; armazenar refresh token em `/mnt/external/openclaw/secrets/google-tokens.json`; implementar auto-refresh antes de cada chamada nas skills `google-tasks/index.js` e `import-statement.sh` via `POST https://oauth2.googleapis.com/token` com `grant_type=refresh_token` (tokens de apps não verificados expiram em 7 dias)
-- [ ] T015 [P] Validar acesso Firefly III API: `curl http://localhost:8080/api/v1/about -H "Authorization: Bearer $FIREFLY_TOKEN"` retorna versão (Quickstart 0.7)
-- [ ] T016 [P] Validar disco externo montado e volumes Docker apontando corretamente: `df -h /mnt/external` + `docker compose config` para verificar bind mounts (Quickstart 0.8)
+- [X] T008 Criar `config/openclaw/openclaw.json` configurando: modelo exclusivo GitHub Copilot, Telegram como canal primário (long polling, sem webhook), e lista de skills a serem carregadas
+- [X] T009 Criar `scripts/setup-pi.sh` cobrindo: verificação de Docker, criação de `/mnt/external/{openclaw,openclaw/memory,logs,backups,firefly}`, permissões, montagem de disco externo
+- [X] T010 [P] Configurar logging centralizado: criar estrutura `/mnt/external/logs/{openclaw,firefly,scheduler}/` e arquivo `config/logrotate.conf` com rotação semanal e retenção de 90 dias (Art. VI.4)
+- [X] T011 Configurar Telegram Bot: registrar bot via BotFather, obter `TELEGRAM_BOT_TOKEN` e `TELEGRAM_CHAT_ID`, adicionar ao `.env`, validar com `curl https://api.telegram.org/bot$TOKEN/getMe`
+- [X] T012 Subir e validar OpenClaw Gateway: `docker compose up openclaw -d`, executar `openclaw agent --message "ping"` e confirmar resposta do Copilot (Quickstart 0.1, 0.2)
+- [X] T013 Validar Telegram Bot integrado ao OpenClaw: enviar mensagem de texto ao bot e confirmar que o agente responde via Telegram (Quickstart 0.3)
+- [X] T014 Configurar Google OAuth 2.0: criar credenciais OAuth no Google Cloud Console com scopes `gmail.readonly`, `tasks`, `drive.file`; executar fluxo de autorização; armazenar refresh token em `/mnt/external/openclaw/secrets/google-tokens.json`; implementar auto-refresh antes de cada chamada nas skills `google-tasks/index.js` e `import-statement.sh` via `POST https://oauth2.googleapis.com/token` com `grant_type=refresh_token` (tokens de apps não verificados expiram em 7 dias)
+- [X] T015 [P] Validar acesso Firefly III API: `curl http://localhost:8080/api/v1/about -H "Authorization: Bearer $FIREFLY_TOKEN"` retorna versão (Quickstart 0.7)
+- [X] T016 [P] Validar disco externo montado e volumes Docker apontando corretamente: `df -h /mnt/external` + `docker compose config` para verificar bind mounts (Quickstart 0.8)
 
 **Checkpoint**: Gateway respondendo via Telegram + OAuth Google ativo + Firefly acessível = fase 2 completa. User stories podem iniciar.
 
