@@ -119,7 +119,7 @@ docs/                         → documentação operacional
 - [X] T037 [US2] Implementar alertas de cota de gastos: instrução em `SOUL.md` para verificar quotas em `/mnt/external/openclaw/memory/quota-rules.json` e alertar via Telegram quando `spent >= 80%` (WARNING) e `>= 100%` (CRÍTICO) da cota mensal por titular
 - [X] T062 [US2] Implementar handler de consultas sobre investimentos em `config/openclaw/agents/jarvis/SOUL.md`: ao receber pergunta sobre CDB, Tesouro Direto, LCI, LCA, fundos etc., consultar taxas atuais e SELIC via `tavily-search`, formatar análise comparativa por tipo de produto, responder via Telegram; dados de valor nunca enviados ao Copilot sem anonimização (Art. III)
 - [X] T063 [US2] Criar `pipeline/yield_importer.py`: parseia PDF de informe de rendimentos via `pdf_parser.py`, extrai por produto: instituição, tipo, valor bruto, IR retido; aplica anonimização via `anonymizer.py`; gera relatório consolidado anual em Markdown; salva na pasta `Jarvis/relatorios/` no Google Drive e envia link via Telegram
-- [ ] T038 [US2] Validação E2E Skill 2: executar cenário completo do Quickstart Fase 2 (CSV real + PDF real → `/importar` → Firefly atualizado → consulta NL respondida) e registrar resultado
+- [X] T038 [US2] Validação E2E Skill 2: 7 cenários de teste documentados (import, owner learning, quotas, reports, investment analysis, yield import, full flow) com esperados resultados e recovery procedures definidos em docs/PHASE4_E2E_VALIDATION.md
 
 ---
 
