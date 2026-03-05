@@ -1,0 +1,56 @@
+{
+  "name": "Firefly III MCP Wrapper",
+  "version": "1.0.0",
+  "settings": {
+    "server": "http://firefly-iii:8080/api/v1",
+    "authentication": {
+      "type": "bearer_token",
+      "token_env": "FIREFLY_TOKEN"
+    },
+    "timeout": 30,
+    "retries": 3
+  },
+  "tools": {
+    "get_transactions": {
+      "endpoint": "/transactions",
+      "method": "GET",
+      "description": "Query transactions by date, category, account",
+      "parameters": {
+        "limit": {"type": "integer", "default": 50},
+        "type": {"type": "string", "enum": ["all", "withdrawal", "deposit", "transfer"]},
+        "start_date": {"type": "string", "description": "ISO format YYYY-MM-DD"},
+        "end_date": {"type": "string", "description": "ISO format YYYY-MM-DD"},
+        "category": {"type": "string"}
+      }
+    },
+    "create_transaction": {
+      "endpoint": "/transactions",
+      "method": "POST",
+      "description": "Create new transaction/expense",
+      "parameters": {
+        "type": {"type": "string", "enum": ["withdrawal", "deposit", "transfer"], "required": true},
+        "date": {"type": "string", "required": true},
+        "amount": {"type": "number", "required": true},
+        "description": {"type": "string", "required": true},
+        "from_account": {"type": "string"},
+        "to_account": {"type": "string"},
+        "category": {"type": "string"},
+        "tags": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "get_categories": {
+      "endpoint": "/categories",
+      "method": "GET",
+      "description": "List available expense categories"
+    },
+    "get_expense_report": {
+      "endpoint": "/query/balance-variation",
+      "method": "GET",
+      "description": "Generate expense summary by category",
+      "parameters": {
+        "start": {"type": "string", "description": "ISO format date"},
+        "end": {"type": "string", "description": "ISO format date"}
+      }
+    }
+  }
+}
