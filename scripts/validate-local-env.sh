@@ -69,14 +69,14 @@ else
   check_fail "docker not found" "apt install docker.io && sudo systemctl enable --now docker"
 fi
 
-if docker info &>/dev/null; then
+if timeout 5 docker ps &>/dev/null; then
   check_pass "docker daemon running"
 else
   check_fail "docker daemon not running" "sudo systemctl start docker"
 fi
 
 # Accept both 'docker compose' (plugin) and 'docker-compose' (standalone)
-if docker compose version &>/dev/null 2>&1; then
+if timeout 5 docker compose version &>/dev/null 2>&1; then
   check_pass "docker compose available ($(docker compose version --short))"
 elif docker-compose version &>/dev/null 2>&1; then
   check_pass "docker-compose available ($(docker-compose --version | cut -d' ' -f3 | tr -d ','))"
