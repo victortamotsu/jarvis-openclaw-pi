@@ -138,7 +138,7 @@ Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando
 **US-5.6**: Como Victor, quero um checklist de segurança pós-deploy validado para ter confiança de que dados sensíveis estão protegidos em produção.
 
 **Critérios de Aceite — Skill 5 (Deploy)**:
-- [ ] Raspberry Pi com todos os pré-requisitos verificados: `docker`, `gh`, `git-crypt`, `sqlite3`, `logrotate`, `jq`
+- [ ] Raspberry Pi com pré-requisitos locais verificados via `scripts/validate-local-env.sh`: apenas `docker`, `docker compose`, `git` e `git-crypt` obrigatórios na máquina host; `sqlite3`, `jq`, `logrotate`, `gh CLI`, `python3` são providos pelo container `scheduler`
 - [ ] Arquivo `.env` de produção criado a partir de `.env.example` com todos os tokens preenchidos e criptografado com `git-crypt`
 - [ ] `docker-compose up -d` sobe os 4 containers (`firefly-iii`, `openclaw-gateway`, `mcporter-firefly`, `scheduler`) sem erro
 - [ ] Todos os containers apresentam status `(healthy)` em `docker ps` em até 2 minutos

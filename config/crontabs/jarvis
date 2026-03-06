@@ -61,8 +61,9 @@
 0 3 * * 0 /home/pi/jarvis-openclaw-pi/scripts/backup.sh >> /mnt/external/logs/backup/cron.log 2>&1
 
 # Logrotate daily at 2am (ensures logs don't consume all disk space)
+# logrotate is installed inside the scheduler container (not required on host)
 # Runs weekly rotation, gzip compression, 90-day retention per config/logrotate.conf
-0 2 * * * /usr/sbin/logrotate /home/pi/jarvis-openclaw-pi/config/logrotate.conf >> /mnt/external/logs/openclaw/cron.log 2>&1
+0 2 * * * logrotate /app/config/logrotate.conf >> /mnt/external/logs/openclaw/cron.log 2>&1
 
 # ─────────────────────────────────────────────────────────────────────
 # Environment
@@ -72,7 +73,8 @@
 SHELL=/bin/bash
 
 # Load .env for docker-compose commands
-PATH=/home/pi/jarvis-openclaw-pi:/home/pi/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# Note: sqlite3, jq, logrotate, gh CLI, python3 are installed in THIS container
+PATH=/app/scripts:/home/pi/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # Log all cron output
 MAILTO=root

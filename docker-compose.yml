@@ -82,18 +82,32 @@ services:
       - jarvis
 
   scheduler:
-    image: alpine:latest
+    image: alpine:3.19
     container_name: jarvis-scheduler
     restart: unless-stopped
-    mem_limit: "64m"
+    mem_limit: "256m"
+    environment:
+      # Passed so scripts inside cron jobs can authenticate without local installs
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - FIREFLY_TOKEN=${FIREFLY_TOKEN}
+      - EXTERNAL_MOUNT=${EXTERNAL_MOUNT:-/mnt/external}
     volumes:
       - ./config/crontabs:/etc/crontabs
       - ./scripts:/app/scripts
+      - ./pipeline:/app/pipeline
+      - ./config:/app/config
       - ${EXTERNAL_MOUNT:-/mnt/external}:/mnt/external
       - /var/run/docker.sock:/var/run/docker.sock
     command: >
       sh -c "
-        apk add --no-cache dcron bash curl git git-crypt &&
+        apk add --no-cache
+          dcron bash curl git git-crypt
+          sqlite jq logrotate
+          github-cli
+          python3 py3-pip &&
+        pip3 install --no-cache-dir --quiet requests &&
         cp /etc/crontabs/jarvis /var/spool/cron/crontabs/root &&
         crond -f -l 2
       "
