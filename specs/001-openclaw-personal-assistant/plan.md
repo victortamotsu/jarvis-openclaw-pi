@@ -282,6 +282,49 @@ Total Fase 1:             ~1.77GB ✅
 - Teste de recovery: simular falha de container + `restart: unless-stopped`
 - `docs/runbook.md` com playbooks de operação e troubleshooting
 
+### Fase 6 — Deploy em Produção (Semana 11)
+
+**Pré-condição**: Fases 0-5 completas e validadas em desenvolvimento (Windows/Docker local)
+
+Etapas de deploy no Raspberry Pi:
+
+1. **Verificação de pré-requisitos** (`scripts/validate-mount.sh`, `scripts/validate-firefly.sh`)
+   - Docker Engine 24+, `git-crypt`, `gh` CLI autenticado, `sqlite3`, `logrotate`, `jq`
+   - Disco externo montado em `/mnt/external/` com pelo menos 50GB livres
+   - Conectividade: internet, Telegram Bot Token válido, GitHub token válido
+
+2. **Configuração de produção** (`.env` + `git-crypt`)
+   - Preencher todos os tokens: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `GITHUB_TOKEN`, `FIREFLY_TOKEN`, `GOOGLE_*`, `TELEGRAM_CHAT_ID`
+   - Encriptar `.env` com `git-crypt lock` antes de qualquer commit
+   - Criar estrutura de diretórios em `/mnt/external/` (script `scripts/setup-pi.sh`)
+
+3. **Inicialização dos containers** (`docker-compose up -d`)
+   - Verificar `docker ps` — 4 containers `(healthy)` em até 2 minutos
+   - Inspecionar logs iniciais: `docker-compose logs openclaw | tail -50`
+
+4. **Pareamento de canais**
+   - WhatsApp: escanear QR code via `docker-compose logs openclaw | grep qr`
+   - Telegram: enviar `/start` ao bot e verificar resposta
+
+5. **Ativação do crontab** (via scheduler container)
+   - Verificar `crontab -l` — 9 entries presentes
+   - Confirmar primeiro job executou: `tail -f /mnt/external/logs/openclaw/cron.log`
+
+6. **Smoke tests E2E** (4 Skills + infraestrutura)
+   - Executar `scripts/validate-telegram-bot.sh`
+   - Executar `scripts/validate-oauth.sh`
+   - Executar `scripts/validate-firefly.sh`
+   - Executar `scripts/health-check.sh`
+   - Testar comando `/importar`, `/monitorar`, `/ideia` via Telegram
+
+7. **Checklist de segurança pós-deploy**
+   - Verificar portas: `docker ps --format "{{.Ports}}"` — apenas `127.0.0.1:*`
+   - Verificar git-crypt: `git-crypt status` — `.env` criptografado
+   - Verificar permissões: `ls -la /mnt/external/openclaw/secrets/` — `700`
+   - Varredura de credenciais em logs: `grep -r "token\|password\|secret" /mnt/external/logs/` deve retornar vazio
+
+**Artefatos produzidos**: `.env` de produção (encriptado), estado de containers verificado, logs iniciais, resultado dos smoke tests
+
 ---
 
 ## Complexity Tracking
@@ -292,6 +335,7 @@ Total Fase 1:             ~1.77GB ✅
 | Pipeline Python isolado (pdf+csv+anonymizer) | PDF parsing robusto em ARM; anonimização obrigatória antes do Copilot (Art. III) | Enviar PDF ao Copilot diretamente: violaria Art. III |
 | `git-crypt` para `.env` | Tokens no repositório criptografados em repouso | `.env` em `.gitignore`: mais simples mas sem proteção se backup vazar |
 | MCP stdio custom para Google Tasks | Expõe Google Tasks como "tool" nativa do agente OpenClaw | REST direto via script: funciona mas não integra nativamente como tool do agente |
+| Deploy direto no Pi (sem CI/CD) | Projeto single-node; overhead de pipeline CI/CD não justificado | GitHub Actions + SSH deploy: adiciona complexidade sem benefício real para 1 usuário |
 
 ---
 
@@ -309,7 +353,11 @@ Fase 2                  Fase 3        ← Fase 3 e 4 independentes entre si
                        (Skill 4 — programador)
                             ↓
                         Fase 5 (polimento + integração cross-skill)
+                            ↓
+                        Fase 6 (deploy em produção no Raspberry Pi)
 ```
 
 **Nota**: Fases 3 e 4 podem ser paralelizadas após Fase 1 estar completa.
+**Nota**: Fase 6 requer Fases 0-5 completas; é sequencial e não paralela.
+
 

@@ -171,6 +171,29 @@ docs/                         → documentação operacional
 
 ---
 
+## Phase 8: Deploy em Produção (US-5)
+
+**Purpose**: Implantar o Jarvis no Raspberry Pi em produção com todos os serviços, canais e automações ativas.
+
+**Pré-condição**: Todas as Phases 1-7 completas (65/65 tasks ✅).
+
+- [ ] T066 [P] Verificar pré-requisitos no Pi: `bash scripts/check-prerequisites.sh` — confirmar que Docker, `gh` CLI, `git-crypt`, `sqlite3`, `logrotate`, `jq` estão instalados e que disco externo está montado em `/mnt/external/` com ≥ 50GB livres
+- [ ] T067 [P] Verificar conectividade de produção: executar `bash scripts/validate-telegram-bot.sh`, `bash scripts/validate-oauth.sh`, `bash scripts/validate-firefly.sh` e confirmar que todos os tokens de produção respondem corretamente
+- [ ] T068 Criar `.env` de produção: copiar `.env.example` para `.env`, preencher todos os tokens reais (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `GITHUB_TOKEN`, `FIREFLY_TOKEN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `APP_KEY`), executar `git-crypt lock` para criptografar
+- [ ] T069 Executar `bash scripts/setup-pi.sh` para criar estrutura de diretórios em `/mnt/external/`: `openclaw/memory/`, `openclaw/tokens/`, `openclaw/secrets/`, `logs/`, `backups/`, `projects/`; aplicar permissões `700` em `secrets/`
+- [ ] T070 Iniciar containers: `docker-compose up -d` → aguardar até 2 minutos → confirmar `docker ps` mostrando 4 containers com status `(healthy)`: `firefly-iii`, `openclaw-gateway`, `mcporter-firefly`, `scheduler`
+- [ ] T071 Parear canais de entrada: (a) WhatsApp — escanear QR code via `docker-compose logs openclaw` com aplicativo WhatsApp → Dispositivos Conectados; (b) Telegram — enviar `/start` ao bot e confirmar resposta do agente em < 30 segundos
+- [ ] T072 Verificar crontab ativo no container scheduler: `docker-compose exec scheduler crontab -l` — confirmar presença dos 9 jobs (check-channels, digest, monthly-report, quota-reset, backup, travel-deals, health-check, logrotate, memory-backup)
+- [ ] T073 Executar smoke tests E2E das 4 Skills via Telegram:
+  - Skill 1: enviar mensagem de teste e aguardar criação de task no Google Tasks
+  - Skill 2: enviar `/importar` com CSV de teste e confirmar importação no Firefly (`curl http://localhost:8080/api/v1/transactions`)
+  - Skill 3: enviar `/monitorar Orlando Jun2026 4pessoas orçamento20000` e confirmar `travel-params.json` atualizado
+  - Skill 4: enviar `/ideia app de rastreamento de gastos pessoais` e confirmar resposta com soluções Tavily
+- [ ] T074 Executar checklist de segurança pós-deploy: (a) verificar portas expostas — `docker ps --format "{{.Ports}}"` deve mostrar apenas `127.0.0.1:*`; (b) verificar git-crypt — `git-crypt status` deve mostrar `.env` encrypted; (c) varredura de credenciais em logs — `grep -rE "token|password|secret|Bearer" /mnt/external/logs/` deve retornar 0 resultados; (d) `bash scripts/health-check.sh` retorna exit 0
+- [ ] T075 Registrar estado do deploy: anotar data/hora do go-live, versão do commit, resultado dos smoke tests e checklist de segurança em `docs/runbook.md` → seção "Deploy History"; atualizar `spec.md` status de `DRAFT` para `DEPLOYED`; fazer commit `chore: Production deployment go-live YYYY-MM-DD`
+
+---
+
 ## Dependencies & Execution Order
 
 ```
@@ -223,7 +246,8 @@ Sequencial (depende de A e B):
 | Fases 1–2 | T028–T038, T062, T063 | US2 completa | T028, T029, T030, T031 |
 | Fases 3–4 | T039–T052 | US3 + US4 | T039, T040, T041, T047, T048 |
 | Polish | T053–T059, T064, T065 | — | T053, T054, T055, T057, T064, T065 |
-| **Total** | **65 tasks** | **4 user stories** | **~23 paralelizáveis** |
+| **Deploy** | **T066–T075** | **US5** | **T066, T067, T069** |
+| **Total** | **75 tasks** | **5 user stories** | **~26 paralelizáveis** |
 
 **MVP recomendado**: Phases 1+2+3 (T001–T027, T060, T061) = infraestrutura + Skill 1 completa.
 Permite validar o loop completo WhatsApp/Gmail → Google Tasks → Telegram antes de avançar para skills mais complexas.

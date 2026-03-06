@@ -128,6 +128,32 @@ Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando
 
 ---
 
+### 3.5 Skill 5 — Deploy & Operação em Produção
+
+**US-5.1**: Como Victor, quero executar o deploy completo do Jarvis no Raspberry Pi para que o assistente esteja operacional em produção com todos os serviços ativos.
+**US-5.2**: Como Victor, quero que todas as credenciais e tokens de produção estejam configurados e protegidos para que o sistema opere de forma segura desde o primeiro boot.
+**US-5.3**: Como Victor, quero executar smoke tests end-to-end após o deploy para confirmar que todas as Skills funcionam antes de depender do sistema no dia a dia.
+**US-5.4**: Como Victor, quero que o WhatsApp esteja pareado e o Telegram Bot ativo para que os canais de entrada estejam todos operacionais no go-live.
+**US-5.5**: Como Victor, quero que o crontab esteja ativo com todos os jobs agendados para que automações (viagens, digest, relatórios, backups, health checks) iniciem imediatamente.
+**US-5.6**: Como Victor, quero um checklist de segurança pós-deploy validado para ter confiança de que dados sensíveis estão protegidos em produção.
+
+**Critérios de Aceite — Skill 5 (Deploy)**:
+- [ ] Raspberry Pi com todos os pré-requisitos verificados: `docker`, `gh`, `git-crypt`, `sqlite3`, `logrotate`, `jq`
+- [ ] Arquivo `.env` de produção criado a partir de `.env.example` com todos os tokens preenchidos e criptografado com `git-crypt`
+- [ ] `docker-compose up -d` sobe os 4 containers (`firefly-iii`, `openclaw-gateway`, `mcporter-firefly`, `scheduler`) sem erro
+- [ ] Todos os containers apresentam status `(healthy)` em `docker ps` em até 2 minutos
+- [ ] Disco externo montado em `/mnt/external/` com estrutura criada: `openclaw/memory/`, `openclaw/tokens/`, `logs/`, `backups/`, `projects/`
+- [ ] Smoke test Skill 1: mensagem via Telegram → resposta do agente em < 30 segundos
+- [ ] Smoke test Skill 2: `/importar` com CSV de teste → importação confirmada no Firefly
+- [ ] Smoke test Skill 3: `/monitorar` com parâmetros de viagem → registro em `travel-params.json`
+- [ ] Smoke test Skill 4: `/ideia` com ideia de teste → pesquisa Tavily confirmada
+- [ ] WhatsApp pareado via QR code (scan único no go-live)
+- [ ] Crontab ativo: `crontab -l` mostra todos os 9 jobs agendados
+- [ ] Checklist de segurança aprovado: sem portas públicas expostas, `.env` criptografado, sem credenciais em logs, permissões `700` em `/mnt/external/openclaw/secrets/`
+- [ ] Health check inicial executa com sucesso: `scripts/health-check.sh` retorna exit 0
+
+---
+
 ## 4. Requisitos Não-Funcionais
 
 ### 4.1 Custo
@@ -342,6 +368,17 @@ Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando
 - PDF parsing via `@sylphx/pdf-reader-mcp` (já em uso desde Fase 2; esta fase foca em otimização de performance no Pi)
 - Dashboard web (OPP-3) se viável
 - Documentação e automação de recovery
+
+### Fase 6 — Deploy em Produção (Semana 11)
+- Verificar pré-requisitos no Pi (Docker, gh CLI, sqlite3, logrotate)
+- Criar `.env` de produção a partir do `.env.example` com todos os tokens reais
+- Executar `docker-compose up -d` e aguardar todos os healthchecks passarem
+- Verificar montagem do disco externo e criar estrutura de diretórios
+- Parear WhatsApp (QR scan único)
+- Ativar crontab com todos os 9 jobs agendados
+- Executar smoke tests E2E para todas as 4 Skills
+- Executar checklist de segurança pós-deploy
+- Validação: agente responde via Telegram ✅ | WhatsApp lendo ✅ | cron ativo ✅ | backups agendados ✅
 
 ---
 
