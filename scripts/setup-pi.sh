@@ -90,7 +90,7 @@ echo "✓ Creating directory structure..."
 
 mkdir -p "$OPENCLAW_PATH"/{memory,data,tmp} || true
 mkdir -p "$SECRETS_PATH" || true
-mkdir -p "{LOG_PATH"/{openclaw,firefly,scheduler,nginx} || true
+mkdir -p "$LOG_PATH"/{openclaw,firefly,scheduler,nginx} || true
 mkdir -p "$EXTERNAL_PATH"/{backups,projects,firefly} || true
 
 echo "  ✓ $OPENCLAW_PATH"
