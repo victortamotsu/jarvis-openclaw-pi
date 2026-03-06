@@ -17,9 +17,9 @@
 #
 # Run BEFORE: docker-compose up -d
 
-set -euo pipefail
+set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" || REPO_ROOT="/home/victor/jarvis-openclaw-pi"
 ENV_FILE="$REPO_ROOT/.env"
 
 # ─────────────────────────────────────────────────────────────────────
