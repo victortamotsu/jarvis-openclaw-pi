@@ -22,7 +22,6 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Node.js 22+ (runtime OpenClaw + skills MCP) · Python 3.11+ (pipeline CSV/PDF) · Bash (scripts cron): Follow standard conventions
 
 ## Recent Changes
-
 - 001-openclaw-personal-assistant: Added Node.js 22+ (runtime OpenClaw + skills MCP) · Python 3.11+ (pipeline CSV/PDF) · Bash (scripts cron)
 
 <!-- MANUAL ADDITIONS START -->
