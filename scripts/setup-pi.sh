@@ -20,6 +20,15 @@ OPENCLAW_PATH="$EXTERNAL_PATH/openclaw"
 SECRETS_PATH="$OPENCLAW_PATH/secrets"
 LOG_PATH="$EXTERNAL_PATH/logs"
 
+# Helper function to use docker compose (plugin) or docker-compose (standalone)
+docker_compose() {
+    if command -v docker-compose &> /dev/null; then
+        docker-compose "$@"
+    else
+        docker compose "$@"
+    fi
+}
+
 echo "═══════════════════════════════════════════════════════════════════"
 echo "  Jarvis OpenClaw PI — Setup Script"
 echo "═══════════════════════════════════════════════════════════════════"
@@ -38,13 +47,17 @@ fi
 DOCKER_VERSION=$(docker --version | awk '{print $3}' | cut -d',' -f1)
 echo "  ℹ Docker version: $DOCKER_VERSION"
 
-if ! command -v docker-compose &> /dev/null; then
-    echo "✗ docker-compose not found. Install with: pip3 install docker-compose"
+# Accept both 'docker compose' (plugin) and 'docker-compose' (standalone)
+if docker compose version &>/dev/null 2>&1; then
+    COMPOSE_VERSION=$(docker compose version --short)
+    echo "  ℹ docker compose version: $COMPOSE_VERSION"
+elif command -v docker-compose &> /dev/null; then
+    COMPOSE_VERSION=$(docker-compose --version | awk '{print $3}' | cut -d',' -f1)
+    echo "  ℹ docker-compose version: $COMPOSE_VERSION"
+else
+    echo "✗ docker compose not found. Install with: apt install docker-compose-plugin"
     exit 1
 fi
-
-COMPOSE_VERSION=$(docker-compose --version | awk '{print $3}' | cut -d',' -f1)
-echo "  ℹ docker-compose version: $COMPOSE_VERSION"
 
 # ─────────────────────────────────────────────────────────────────────
 # 2. Check external mount exists
@@ -152,11 +165,11 @@ echo ""
 echo "✓ Validating Docker Compose configuration..."
 
 cd "$REPO_ROOT"
-if docker-compose config > /dev/null 2>&1; then
+if docker_compose config > /dev/null 2>&1; then
     echo "  ✓ docker-compose.yml is valid"
 else
     echo "  ✗ docker-compose.yml has errors:"
-    docker-compose config 2>&1 | head -10
+    docker_compose config 2>&1 | head -10
     exit 1
 fi
 
@@ -237,7 +250,7 @@ echo ""
 echo "✓ Pre-pulling Docker images (optional)..."
 echo "  ℹ This may take 2-5 minutes on first run..."
 
-docker-compose pull --ignore-pull-failures > /dev/null 2>&1 || echo "  ℹ (Some images may not exist yet)"
+docker_compose pull --ignore-pull-failures > /dev/null 2>&1 || echo "  ℹ (Some images may not exist yet)"
 
 # ─────────────────────────────────────────────────────────────────────
 # 11. Summary & next steps
@@ -254,14 +267,14 @@ echo "1. Edit credentials:"
 echo "   nano .env"
 echo ""
 echo "2. Start containers:"
-echo "   docker-compose up -d"
+echo "   docker compose up -d"
 echo ""
 echo "3. Verify health:"
-echo "   docker-compose ps"
-echo "   docker-compose logs -f openclaw"
+echo "   docker compose ps"
+echo "   docker compose logs -f openclaw"
 echo ""
 echo "4. Test Telegram bot:"
-echo "   docker-compose exec openclaw openclaw agent --message 'ping'"
+echo "   docker compose exec openclaw openclaw agent --message 'ping'"
 echo ""
 echo "📖 Full documentation: docs/runbook.md"
 echo ""
