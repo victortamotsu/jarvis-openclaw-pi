@@ -39,8 +39,7 @@ services:
     volumes:
       - firefly_iii_firefly_app_data:/var/www/html/storage
     depends_on:
-      firefly-db:
-        condition: service_healthy
+      - firefly-db
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/"]
       interval: 60s
@@ -95,8 +94,7 @@ services:
       - MCPORTER_DEBUG=false
     command: echo "mcporter service running (placeholder)"
     depends_on:
-      firefly-iii:
-        condition: service_healthy
+      - firefly-iii
     healthcheck:
       test: ["CMD", "test", "-f", "/etc/os-release"]
       interval: 60s
@@ -136,8 +134,7 @@ services:
         crond -f -l 2
       "
     depends_on:
-      openclaw:
-        condition: service_healthy
+      - openclaw
     healthcheck:
       test: ["CMD", "test", "-f", "/var/spool/cron/crontabs/root"]
       interval: 60s
