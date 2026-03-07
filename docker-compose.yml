@@ -145,9 +145,7 @@ services:
 
 volumes:
   firefly_iii_firefly_db_data:
-    external: true
   firefly_iii_firefly_app_data:
-    external: true
 
 networks:
   jarvis:
