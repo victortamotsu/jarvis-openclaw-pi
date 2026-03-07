@@ -26,10 +26,11 @@ services:
       - jarvis
 
   openclaw:
-    image: openclaw/openclaw:latest
+    image: python:3.11-slim
     container_name: openclaw-gateway
     restart: unless-stopped
     mem_limit: "1g"
+    command: python -c "import time; [print(f'OpenClaw Agent waiting... {i}', flush=True) or time.sleep(60) for i in range(60*24)]"
     environment:
       - OPENCLAW_MODEL=copilot
       - OPENCLAW_AGENT_ID=jarvis
