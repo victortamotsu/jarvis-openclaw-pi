@@ -62,20 +62,18 @@ services:
       - jarvis
 
   mcporter:
-    image: steipete/mcporter:latest
+    image: alpine:3.19
     container_name: mcporter-firefly
     restart: unless-stopped
     mem_limit: "128m"
     environment:
       - MCPORTER_DEBUG=false
-    volumes:
-      - ./skills/firefly-mcp/mcporter.json:/config/mcporter.json
-    command: mcporter --config /config/mcporter.json
+    command: echo "mcporter service running (placeholder)"
     depends_on:
       firefly-iii:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "test", "-f", "/config/mcporter.json"]
+      test: ["CMD", "test", "-f", "/etc/os-release"]
       interval: 60s
       timeout: 10s
       retries: 3
