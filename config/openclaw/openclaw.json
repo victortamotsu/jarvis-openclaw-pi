@@ -1,269 +1,70 @@
+// openclaw.json — Jarvis Personal Assistant
+// Schema: OpenClaw JSON5 (strict validation — only known keys allowed)
+// Last updated: 2026-03-08 — Phase 8.2 (T090): added skills.entries with 6 skills + TAVILY_API_KEY
 {
-  "id": "jarvis-openclaw-pi",
-  "version": "0.1.0",
-  "name": "Jarvis — Personal Assistant OpenClaw",
-  "description": "Assistente pessoal multimodal para Victor: pendências, financeiro, viagens, ideias de código.",
-  "model": "copilot",
-  "model_config": {
-    "provider": "github",
-    "model_id": "gpt-4o",
-    "max_tokens": 4096,
-    "timeout_seconds": 30
+  agents: {
+    defaults: {
+      model: {
+        primary: "github-copilot/gpt-4.1", // multiplier 0 — sem débito de premium requests
+      },
+      workspace: "/home/node/.openclaw/workspace",
+    },
   },
-  "channels": {
-    "default": "telegram",
-    "telegram": {
-      "enabled": true,
-      "type": "long_polling",
-      "webhook_mode": false,
-      "polling_interval": 3,
-      "bot_token_env": "TELEGRAM_BOT_TOKEN",
-      "chat_id_env": "TELEGRAM_CHAT_ID"
-    }
+  channels: {
+    telegram: {
+      botToken: "${TELEGRAM_BOT_TOKEN}",
+      // allowFrom: sem isso o bot responde com codigo de pareamento (dmPolicy: pairing)
+      allowFrom: ["${TELEGRAM_CHAT_ID}"],
+    },
   },
-  "workspace": "/mnt/external/openclaw",
-  "skills": [
-    {
-      "name": "google-tasks",
-      "type": "mcp_stdio",
-      "enabled": true,
-      "path": "skills/google-tasks",
-      "config": {
-        "token_env": "GOOGLE_REFRESH_TOKEN",
-        "client_id_env": "GOOGLE_CLIENT_ID",
-        "client_secret_env": "GOOGLE_CLIENT_SECRET",
-        "auth_type": "oauth2_refresh",
-        "token_url": "https://oauth2.googleapis.com/token"
+  skills: {
+    entries: {
+      "tavily-search": {
+        enabled: true,
+        env: {
+          TAVILY_API_KEY: "${TAVILY_API_KEY}",
+        },
       },
-      "tools": {
-        "create_task": {
-          "description": "Create new task in Google Tasks list",
-          "enabled": true
+      "flight-search": {
+        enabled: true,
+        env: {
+          SERP_API_KEY: "${SERP_API_KEY}",
         },
-        "update_task": {
-          "description": "Update task (notes, status, due date)",
-          "enabled": true
+      },
+      "google-tasks": {
+        enabled: true,
+        env: {
+          GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID}",
+          GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET}",
+          GOOGLE_REFRESH_TOKEN: "${GOOGLE_REFRESH_TOKEN}",
         },
-        "list_tasks": {
-          "description": "List tasks with optional filtering",
-          "enabled": true
+      },
+      "firefly-finance": {
+        enabled: true,
+        env: {
+          FIREFLY_URL: "http://firefly-iii:8080",
+          FIREFLY_TOKEN: "${FIREFLY_TOKEN}",
         },
-        "create_subtask": {
-          "description": "Create subtask under parent task",
-          "enabled": true
+      },
+      "travel-monitor": {
+        enabled: true,
+      },
+      "code-agent": {
+        enabled: true,
+        env: {
+          GITHUB_TOKEN: "${GITHUB_TOKEN}",
         },
-        "complete_task": {
-          "description": "Mark task as completed",
-          "enabled": true
-        }
-      }
+      },
     },
+  },
+  // MCP servers started as stdio child processes by OpenClaw Gateway
+  mcp_servers: [
     {
-      "name": "gmail-native",
-      "type": "native_skill",
-      "enabled": true,
-      "auth_type": "oauth2",
-      "scopes": [
-        "https://www.googleapis.com/auth/gmail.readonly",
-        "https://www.googleapis.com/auth/gmail.compose"
-      ],
-      "config": {
-        "polling_interval": 300,
-        "mark_read_on_process": true
-      },
-      "tools": {
-        "list_messages": {
-          "description": "List unread messages from last N days",
-          "enabled": true
-        },
-        "get_message": {
-          "description": "Get full message content",
-          "enabled": true
-        },
-        "send_mail": {
-          "description": "Send email reply",
-          "enabled": false
-        }
-      }
+      name: "airbnb",
+      command: "npx",
+      args: ["-y", "@openbnb/mcp-server-airbnb"],
+      // robots.txt compliance active by default (no --ignore-robots-txt)
+      // If smoke test shows majority of searches fail, add: args: ["-y", "@openbnb/mcp-server-airbnb", "--ignore-robots-txt"]
     },
-    {
-      "name": "whatsapp-openclaw",
-      "type": "native_skill",
-      "enabled": true,
-      "auth_type": "qr_code",
-      "config": {
-        "mode": "read_only",
-        "exclude_chats": ["Notificações", "Atualizações"],
-        "daily_digest": true,
-        "digest_time": "22:00",
-        "qr_display_port": 3001
-      },
-      "tools": {
-        "list_messages": {
-          "description": "Get unread messages from personal chats",
-          "enabled": true
-        },
-        "send_message": {
-          "description": "Send reply message",
-          "enabled": false
-        }
-      }
-    },
-    {
-      "name": "telegram-bot",
-      "type": "native_skill",
-      "enabled": true,
-      "auth_type": "bot_token",
-      "config": {
-        "token_env": "TELEGRAM_BOT_TOKEN",
-        "polling": true
-      },
-      "tools": {
-        "send_message": {
-          "description": "Send message or alert to Victor",
-          "enabled": true
-        },
-        "send_alert": {
-          "description": "Send alert with priority markers (🔔=ACAO, ⚠️=URGENTE, 🚨=CRITICO)",
-          "enabled": true
-        },
-        "ask_confirmation": {
-          "description": "Ask for user confirmation (yes/no buttons)",
-          "enabled": true
-        }
-      }
-    },
-    {
-      "name": "tavily-search",
-      "type": "mcp_stdio",
-      "enabled": true,
-      "path": "skills/tavily",
-      "config": {
-        "api_key_env": "TAVILY_API_KEY",
-        "max_results": 5,
-        "search_depth": "advanced"
-      },
-      "tools": {
-        "search": {
-          "description": "Search web for current prices, reviews, deals",
-          "enabled": true
-        }
-      }
-    },
-    {
-      "name": "flight-search",
-      "type": "mcp_stdio",
-      "enabled": true,
-      "path": "skills/flight-search",
-      "config": {
-        "no_api_key_required": true,
-        "public_search": true
-      },
-      "tools": {
-        "search_flights": {
-          "description": "Search flight prices (Skyscanner-like)",
-          "enabled": true
-        }
-      }
-    },
-    {
-      "name": "firefly-mcp",
-      "type": "mcp_stdio",
-      "enabled": true,
-      "path": "skills/firefly-mcp",
-      "config": {
-        "mcporter_endpoint": "http://mcporter-firefly:3000",
-        "firefly_url_env": "FIREFLY_URL",
-        "firefly_token_env": "FIREFLY_TOKEN",
-        "auth_type": "bearer_token"
-      },
-      "tools": {
-        "get_transactions": {
-          "description": "Query transactions by date, category, account",
-          "enabled": true
-        },
-        "create_transaction": {
-          "description": "Create new transaction/expense",
-          "enabled": true
-        },
-        "get_categories": {
-          "description": "List available expense categories",
-          "enabled": true
-        },
-        "get_expense_report": {
-          "description": "Generate expense summary report",
-          "enabled": true
-        }
-      }
-    },
-    {
-      "name": "pdf-reader-mcp",
-      "type": "mcp_stdio",
-      "enabled": true,
-      "path": "node_modules/@sylphx/pdf-reader-mcp",
-      "config": {
-        "auto_extract_tables": true,
-        "ocr_enabled": false
-      },
-      "tools": {
-        "read_pdf": {
-          "description": "Extract text and tables from PDF",
-          "enabled": true
-        }
-      }
-    },
-    {
-      "name": "github-cli",
-      "type": "native_skill",
-      "enabled": true,
-      "auth_type": "pat",
-      "config": {
-        "token_env": "GITHUB_TOKEN"
-      },
-      "tools": {
-        "create_repo": {
-          "description": "Create new GitHub repository",
-          "enabled": true
-        },
-        "list_repos": {
-          "description": "List user repositories",
-          "enabled": true
-        }
-      }
-    }
   ],
-  "memory": {
-    "type": "local_json",
-    "storage_path": "/mnt/external/openclaw/memory",
-    "files": {
-      "owner_rules": "owner-rules.json",
-      "travel_params": "travel-params.json",
-      "quota_rules": "quota-rules.json"
-    }
-  },
-  "logging": {
-    "level": "INFO",
-    "output_dir": "/mnt/external/logs/openclaw",
-    "format": "json",
-    "rotation": {
-      "daily": true,
-      "retention_days": 90
-    }
-  },
-  "health_check": {
-    "enabled": true,
-    "endpoint": "/health",
-    "interval_seconds": 30
-  },
-  "agents": [
-    {
-      "id": "jarvis",
-      "type": "singleton",
-      "config": {
-        "personality_file": "config/openclaw/agents/jarvis/SOUL.md",
-        "user_profile_file": "config/openclaw/agents/jarvis/USER.md",
-        "skills_reference_file": "config/openclaw/agents/jarvis/AGENTS.md"
-      }
-    }
-  ]
 }

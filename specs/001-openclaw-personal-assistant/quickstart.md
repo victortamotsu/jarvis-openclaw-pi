@@ -68,7 +68,17 @@
 5. **Agente envia Telegram**: "✈️ DEAL: GRU→MCO LATAM R$2.800/pessoa (4x = R$11.200). 1 parada. Link: ..."
 6. **Agente cria task** no Google Tasks: "Deal Orlando Jul/2026 - R$11.200" com due date de 48h
 
-**PASS se**: Parâmetros salvos + Busca retorna resultados + Alerta enviado via Telegram + Task criada
+**PASS se**: Parâmetros salvos + Alerta enviado via Telegram + Task criada **E** a mensagem de voo contém **TODOS** os campos obrigatórios:
+1. Airline + número do voo (ex: "LATAM LA 8084")
+2. Horário de partida com IATA de origem (ex: "GRU 22:30")
+3. Horário de chegada com IATA de destino e indicador de pernoite se aplicável (ex: "MCO 09:55+1")
+4. Duração total do voo (ex: "11h25")
+5. Número de escalas (ex: "1 escala (MIA)")
+6. Preço por pessoa em BRL (ex: "R$ 2.800/pessoa")
+7. Preço total para todos os adultos em BRL (ex: "R$ 11.200 total (4 adultos)")
+8. Link direto ao Google Flights (`https://www.google.com/flights?...`)
+
+**FAIL se**: Qualquer um dos 8 campos acima estiver ausente na resposta do agente.
 
 ---
 

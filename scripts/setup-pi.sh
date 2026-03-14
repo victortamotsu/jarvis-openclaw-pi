@@ -214,6 +214,12 @@ EOF
     echo "  ✓ quota-rules.json initialized"
 fi
 
+# serp-usage.json — SerpAPI monthly quota tracking (T107 — Phase 10)
+if [ ! -f "$OPENCLAW_PATH/memory/serp-usage.json" ]; then
+    cp "$REPO_ROOT/templates/memory/serp-usage.json" "$OPENCLAW_PATH/memory/serp-usage.json"
+    echo "  ✓ serp-usage.json initialized (SerpAPI quota tracker, 0/250)"
+fi
+
 chmod 600 "$OPENCLAW_PATH/memory"/*.json
 
 # ─────────────────────────────────────────────────────────────────────

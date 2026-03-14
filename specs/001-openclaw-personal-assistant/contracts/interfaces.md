@@ -184,38 +184,161 @@ gog gmail send --to "<spouse-email>" --subject "Relatório Mensal Fev/2026" --bo
 gog gmail search "subject:(promoção OR deal OR oferta) AND (voo OR hotel OR passagem)"
 ```
 
-### 2.4 Flight Search (Skill 3 → skill)
+### 2.4 SerpAPI Google Flights (Skill 3 → SerpAPI)
 
+```bash
+# Request
+GET https://serpapi.com/search.json \
+  ?engine=google_flights \
+  &departure_id=GRU \
+  &arrival_id=MCO \
+  &outbound_date=2026-07-01 \
+  &return_date=2026-07-15 \
+  &adults=4 \
+  &currency=BRL \
+  &hl=pt \
+  &type=1 \
+  &api_key=$SERP_API_KEY
+
+# type: 1 = ida e volta | 2 = somente ida
+# departure_id / arrival_id: código IATA do aeroporto
 ```
-# Via Flight Search skill
-search_flights {
-  origin: "GRU",           # Guarulhos
-  destination: "MCO",      # Orlando
-  departure_date: "2026-07-01",
-  return_date: "2026-07-15",
-  passengers: 4,
-  cabin_class: "economy",
-  max_stops: 1
-}
 
-# Response
+**Response (campos relevantes)**:
+
+```json
 {
-  flights: [
+  "search_metadata": {
+    "google_flights_url": "https://www.google.com/flights?...",
+    "cached": false
+  },
+  "best_flights": [
     {
-      airline: "LATAM",
-      price_total: 12400.00,
-      price_per_person: 3100.00,
-      departure: "2026-07-01T22:30",
-      arrival: "2026-07-02T06:15",
-      stops: 0,
-      duration: "9h45m",
-      booking_url: "https://..."
+      "flights": [
+        {
+          "airline": "LATAM Airlines",
+          "flight_number": "LA 8084",
+          "departure_airport": { "id": "GRU", "time": "2026-07-01 22:30" },
+          "arrival_airport":  { "id": "MIA", "time": "2026-07-02 04:15" },
+          "duration": 345,
+          "airplane": "Boeing 767"
+        },
+        {
+          "airline": "American Airlines",
+          "flight_number": "AA 1234",
+          "departure_airport": { "id": "MIA", "time": "2026-07-02 09:00" },
+          "arrival_airport":  { "id": "MCO", "time": "2026-07-02 09:55" },
+          "duration": 55
+        }
+      ],
+      "layovers": [
+        { "id": "MIA", "name": "Miami International Airport", "duration": 285 }
+      ],
+      "total_duration": 685,
+      "price": 2800,
+      "type": "Round trip"
     }
   ]
 }
 ```
 
-### 2.5 GitHub (Skill 4 → GitHub API/CLI)
+**Mapeamento para formato obrigatório de saída** (AC Skill 3):
+
+| Campo AC | Campo SerpAPI |
+|----------|---------------|
+| Airline + número do voo | `best_flights[0].flights[0].airline` + `.flight_number` |
+| Horário partida com IATA | `departure_airport.id` + `departure_airport.time` |
+| Horário chegada com IATA (+d) | `arrival_airport.id` + `arrival_airport.time` (calcular +d se datas diferem) |
+| Duração total | `best_flights[0].total_duration` (minutos → "Xh Ym") |
+| Número de escalas | `len(best_flights[0].layovers)` |
+| Preço/pessoa em BRL | `best_flights[0].price` |
+| Total para todos adultos em BRL | `best_flights[0].price * adults` |
+| Link Google Flights | `search_metadata.google_flights_url` |
+
+**Regras**:
+- Antes de chamar: verificar `serp-usage.json` (`blocked == true` → retornar erro sem chamada HTTP)
+- Se `search_metadata.cached == true`: não incrementar contador de cota
+- Retornar sempre mínimo 1 opção (`best_flights[0]`); listar até 3 se houver
+
+### 2.5 Airbnb MCP (Skill 3 → mcp-server-airbnb)
+
+**Configuração no openclaw.json**:
+```json
+{
+  "mcp_servers": [
+    {
+      "name": "airbnb",
+      "command": "npx",
+      "args": ["-y", "@openbnb/mcp-server-airbnb"]
+    }
+  ]
+}
+```
+
+**Tool: `airbnb_search`**:
+```json
+{
+  "location": "Orlando, Florida",
+  "checkin": "2026-07-01",
+  "checkout": "2026-07-15",
+  "adults": 4,
+  "children": 0,
+  "minPrice": 100,
+  "maxPrice": 300
+}
+```
+
+**Tool: `airbnb_listing_details`**:
+```json
+{
+  "id": "<listing-id>",
+  "checkin": "2026-07-01",
+  "checkout": "2026-07-15",
+  "adults": 4
+}
+```
+
+**Configuração docker-compose (container mcp-airbnb)**:
+```yaml
+mcp-airbnb:
+  image: node:20-alpine
+  command: npx -y @openbnb/mcp-server-airbnb
+  restart: unless-stopped
+  mem_limit: 200m
+  # robots.txt: compliance ativada por padrão (sem --ignore-robots-txt)
+  # Se smoke test falhar: adicionar arg --ignore-robots-txt e documentar decisão
+```
+
+**Regras**:
+- robots.txt compliance ativada por padrão; ativar `--ignore-robots-txt` só após confirmação de falha no smoke test
+- `airbnb_search` é o ponto de entrada; `airbnb_listing_details` apenas para detalhamento pedido pelo usuário
+
+### 2.6 SerpAPI Quota Management (Skill 3 → serp-usage.json)
+
+```
+Antes de cada chamada SerpAPI:
+  1. Ler /mnt/external/openclaw/memory/serp-usage.json
+  2. Se month != currentMonth: reset (calls_used=0, alert_80_sent=false, blocked=false, month=currentMonth)
+  3. Se blocked == true: RETORNAR ERRO sem chamada HTTP
+     Mensagem: "Cota SerpAPI esgotada (250/250). Renova em 1º de [mes seguinte]."
+
+Após chamada bem-sucedida (somente se cached == false):
+  4. calls_used += 1; last_call = now()
+  5. Se calls_used == 200: alert_80_sent = true; enviar Telegram AVISO
+     Mensagem: "⚠️ SerpAPI: 200/250 chamadas usadas em [mês]. Monitoramentos automáticos podem ser suspensos."
+  6. Se calls_used >= 250: blocked = true; enviar Telegram ALERTA
+     Mensagem: "🛑 SerpAPI: cota esgotada (250/250). Buscas de voo desativadas até 1º de [mês seguinte]."
+  7. Salvar serp-usage.json
+```
+
+**Health check semanal** (scheduler cron):
+```bash
+# Semanal (domingo 08:00)
+0 8 * * 0 openclaw agent --message "Health check: executar 1 busca SerpAPI de teste (GRU-GIG proxima semana) + verificar mcp-airbnb acessível. Alertar Telegram APENAS se falhar."
+# Consome ~4 chamadas SerpAPI/mês; silencioso em caso de sucesso
+```
+
+### 2.7 GitHub (Skill 4 → GitHub API/CLI)
 
 ```
 # Criar repositório

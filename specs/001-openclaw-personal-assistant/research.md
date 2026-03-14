@@ -108,6 +108,90 @@ GitHub Copilot Pro não cobra por token (modelo subscription), então **custo ad
 
 ---
 
+### 1.5 Flight Search Backend — **DECIDIDO: SerpAPI Google Flights**
+
+| Opção | ARM64 | Dados estruturados | Custo | Estabilidade Pi |
+|-------|-------|-------------------|-------|----------------|
+| **SerpAPI `engine=google_flights`** | ✅ HTTP puro | ✅ JSON estruturado | ✅ 250/mês free | ✅ Alta |
+| Playwright + scraping Google Flights | ❌ Sem imagem ARM64 | ✅ Se implementado | Grátis mas inviável | ❌ 400-600MB RAM extra; Pi tem ~550MB livre |
+| Tavily generic search | ✅ HTTP puro | ❌ Links genéricos (Kayak, Decolar) | ✅ Free tier | ✅ Alta, mas inadequada |
+| Google Flights API oficial | N/A | ✅ | ❌ Sem API pública | N/A |
+
+**Decisão**: SerpAPI `engine=google_flights`
+- **Rationale**: Retorna JSON estruturado com `best_flights[].flights[].{airline, flight_number, departure_airport.{id,time}, arrival_airport.{id,time}, duration}`, `best_flights[].price`, `best_flights[].layovers[]`, e `search_metadata.google_flights_url`. Exatamente o que o AC exige. Tavily só retornava links de comparadores (Kayak, Decolar, LATAM "a partir de R$"), sem dados estruturados — impede formato de saída obrigatório.
+- **API key**: `c899c4d126f8b200009ecd8945b5f788aad8e90bb67beb7221a859b9c4276fff` (em `.env` como `SERP_API_KEY`)
+- **Limite**: 250 chamadas/mês free; cached searches são gratuitas e não contam
+- **Alternativas descartadas**: Playwright (sem imagem ARM64 para Docker; 400-600MB RAM inviável no Pi); Tavily (inadequada para dados estruturados de voo)
+
+---
+
+### 1.6 Accommodation Search — **DECIDIDO: Airbnb MCP (mcp-server-airbnb)**
+
+| Opção | ARM64 | Integração | Custo | Estabilidade |
+|-------|-------|-----------|-------|-------------|
+| **mcp-server-airbnb** (`@openbnb/mcp-server-airbnb`) | ✅ Node.js puro | ✅ MCP stdio | ✅ Grátis / MIT | 🟡 robots.txt policy |
+| Booking.com | N/A | ❌ Sem API pública gratuita | ❌ Requer parceria | N/A |
+| Google Hotels via SerpAPI | ✅ HTTP | ✅ JSON estruturado | ⚠️ Consome cota SerpAPI | 🟢 |  
+| Airbnb via Tavily | ✅ HTTP | ❌ Links genéricos | ✅ Free tier | 🟡 |
+
+**Decisão**: `@openbnb/mcp-server-airbnb` v0.1.3 (MIT License)
+- **Rationale**: Único MCP open-source disponível para acomodações com dados estruturados. Node.js puro → ARM64-nativo. Booking.com removido do escopo (sem API gratuita disponível).
+- **Run command**: `npx -y @openbnb/mcp-server-airbnb` (default: robots.txt compliance ativada)
+- **robots.txt policy**: Iniciar com compliance ativada (padrão). Se smoke test da Fase 3 revelar falha na maioria das buscas de acomodação, **reconfigurar permanentemente** com `--ignore-robots-txt` e documentar decisão.
+- **Tools disponíveis**: `airbnb_search(location, checkin, checkout, adults, ...)` e `airbnb_listing_details(id, ...)`
+- **Container**: Node.js 20 Alpine, ~150MB RAM, arm64 compatível
+- **Alternativa descartada**: Booking.com (sem API pública gratuita; removido do escopo do feature)
+
+---
+
+### 1.7 Modelo de IA — **DECIDIDO: GPT-4.1 (multiplier 0)**
+
+| Modelo | Disponível | Multiplier | Observação |
+|--------|-----------|-----------|------------|
+| **GPT-4.1** | ✅ | **0** ← **escolhido** | Zero débito de premium requests |
+| GPT-4o | ✅ | 0 | Opção válida, GPT-4.1 preferido |
+| GPT-5 mini | ✅ | 0 | Capacidade inferior |
+| Gemini 3 Flash | ✅ | 0.33 | Cobrado em premium requests — rejeitado |
+| Gemini 3 Pro | ✅ | 1.0 | Cobrado em premium requests — rejeitado |
+| Gemini 2.0 Flash | ❌ RETIRED 2025-10-23 | N/A | Foi removido; não disponível |
+| Claude Sonnet 4.x | ✅ | 1.0 | Cobrado em premium requests — rejeitado |
+
+**Decisão**: `github-copilot/gpt-4.1` (multiplier 0)
+- **Rationale**: Único modelo com capacidade adequada E multiplier 0. Gemini 2.0 Flash foi aposentado em 2025-10-23 (confirmado na documentação oficial GitHub Copilot 2026-03-08). Gemini 3 Flash rejeitado pois multiplier 0.33 debitaria premium requests do plano Copilot Pro existente. GPT-4.1 tem multiplier 0 → custo adicional = R$ 0.
+- **Fonte verificada**: `https://docs.github.com/pt/copilot/reference/ai-models/supported-models` (consultado 2026-03-08)
+
+---
+
+### 1.8 SerpAPI Quota Management — **DECIDIDO: Alert 80% + Block 100%**
+
+**Problema**: SerpAPI free tier limita 250 chamadas/mês. Sem controle, o agente pode esgotar a cota com monitoramentos automáticos, bloqueando buscas sob demanda do usuário.
+
+**Decisão**: Contador local persistente em `serp-usage.json`
+
+```json
+{
+  "month": "2026-03",
+  "calls_used": 45,
+  "calls_limit": 250,
+  "last_call": "2026-03-08T14:32:00Z",
+  "alert_80_sent": false,
+  "blocked": false
+}
+```
+
+**Política**:
+- Antes de cada chamada SerpAPI: ler `serp-usage.json`, verificar `blocked`
+- Se `calls_used >= 200` (80%): enviar alerta Telegram (uma vez por mês, `alert_80_sent`)
+- Se `calls_used >= 250` (100%): definir `blocked = true`; retornar erro amigável "Cota SerpAPI esgotada. Reseta em 1º do mês."
+- Reset automático: quando `month != currentMonth` → zerar contador
+- Cached searches do SerpAPI não contam (resposta `search_metadata.cached = true`) → não incrementar
+
+**Rationale**: Evita surpresa de bloqueio. 80% de alerta dá margem para o usuário decidir suspender monitoramentos automáticos se necessário. 100% de bloqueio é defensivo para não ultrapassar o free tier.
+
+**Health check semanal**: 1 SerpAPI + ping Airbnb MCP → ~4 chamadas SerpAPI/mês. Alerta Telegram **apenas se falhar**. Não envia confirmação de sucesso (silencioso).
+
+---
+
 ## 2. Arquitetura Docker no Raspberry Pi
 
 ### 2.1 Inventário de Containers
@@ -190,7 +274,8 @@ Disco Externo 2TB (/mnt/external):
 | Telegram Bot | **Telegram Bot API** (skill customizada ou MCP) | N/A | ✅ API oficial, implementar |
 | WhatsApp (leitura) | **openclaw-whatsapp** | 317 | ⚠️ QR pairing, apenas leitura |
 | Web search | **Tavily Search** | 311 | ✅ Otimizado para IA |
-| Flight search | **Flight Search** | 2.5k | ✅ Sem API key |
+| Flight search | **SerpAPI** `engine=google_flights` | N/A | ✅ 250/mês free; API key em .env; JSON estruturado |
+| Accommodation | **mcp-server-airbnb** (@openbnb) | 392 | ✅ Node.js MCP; npx; ARM64 nativo |
 | MCP support | **openclaw-mcp-plugin** | 3.8k | ✅ Conecta MCPs genéricos |
 | Memory | **Ontology** | 206 | ✅ Knowledge graph |
 | Self-improvement | **Self-improving-agent** | 939 | ✅ Aprende de erros |
@@ -300,4 +385,73 @@ Decisões coletadas na sessão `/speckit.clarify`. Substituem ou complementam se
 - **Ação do agente**: busca arquivo mais recente na pasta configurada → executa pipeline de importação
 - **Sem monitoramento assíncrono do Drive**: evita polling contínuo e reduz uso de tokens
 - **Confirmação**: agente responde no Telegram com resultado da importação (sucesso/erro/itens importados)
+
+---
+
+## 8. Gaps Críticos — OpenClaw Real vs Implementação Anterior (2026-03-07)
+
+> Pesquisa realizada consultando `npm info openclaw`, `docs.openclaw.ai/install/docker`, `docs.openclaw.ai/concepts/model-providers` e `docs.openclaw.ai/providers/github-copilot`.
+
+### 8.1 Imagem Docker — CORRIGIDO
+
+**Decisão**: `ghcr.io/openclaw/openclaw:latest` (GitHub Container Registry)  
+**Racional**: A imagem `openclaw/openclaw` no Docker Hub retorna 404. A imagem oficial é publicada no GHCR.  
+**Alternativa rejeitada**: Build local do repo (lento num Pi ARM64, desnecessário com imagem pré-compilada disponível).
+
+### 8.2 Porta Padrão do Gateway — CORRIGIDO
+
+**Decisão**: Porta `18789` (padrão do OpenClaw)  
+**Racional**: A porta 3000 nunca foi documentada no OpenClaw — era um placeholder inventado. O gateway padrão roda em `:18789` e expõe `/healthz` e `/readyz`.  
+**Health endpoint correto**: `curl http://localhost:18789/healthz`
+
+### 8.3 Schema `openclaw.json` — REESCREVER
+
+**Decisão**: JSON5 com chaves `agents.defaults.model.primary`, `channels.telegram.botToken`, `gateway.bind`  
+**Racional**: O OpenClaw aplica validação estrita de schema. O arquivo atual usa chaves inventadas (`id`, `version`, `channels.default`, `skills[*].type`, `model_config`) que causam falha de inicialização.  
+**Alternativa rejeitada**: Manter arquivo antigo e tentar adaptar — sem caminho de migração, schema é incompatível.
+
+**Schema mínimo funcional:**
+```json5
+{
+  agents: { defaults: { model: { primary: "github-copilot/gpt-4o" } } },
+  channels: {
+    telegram: {
+      botToken: "${TELEGRAM_BOT_TOKEN}",
+      allowFrom: ["${TELEGRAM_CHAT_ID}"],
+    },
+  },
+  gateway: { bind: "loopback" },
+}
+```
+
+### 8.4 Auth GitHub Copilot — VALIDADO
+
+**Decisão**: Usar `GITHUB_TOKEN` como variável de ambiente (provider `github-copilot` aceita `COPILOT_GITHUB_TOKEN` / `GH_TOKEN` / `GITHUB_TOKEN`)  
+**Racional**: O provider `github-copilot` é built-in no OpenClaw e troca o GitHub token por tokens da Copilot API automaticamente. Não requer login interativo quando o token está no ambiente.  
+**Risco residual**: O Personal Access Token deve ter escopo `copilot` habilitado na conta GitHub. Validar com `docker exec openclaw-gateway node dist/index.js models status` no primeiro boot.  
+**Alternativa para falha**: `openclaw models auth login-github-copilot` (requer TTY interativo uma vez).
+
+### 8.5 Volume Mount Path — CORRIGIDO
+
+**Decisão**: Montar `./config/openclaw` em `/home/node/.openclaw` (container roda como usuário `node`, UID 1000)  
+**Racional**: O OpenClaw resolve config e workspace em `/home/node/.openclaw/` — caminho do home do usuário `node`.  
+**Alternativa rejeitada**: `/config/openclaw` (caminho inventado que o OpenClaw nunca lê).
+
+### 8.6 DM Pairing Policy Telegram — CORRIGIDO
+
+**Decisão**: `channels.telegram.allowFrom: ["${TELEGRAM_CHAT_ID}"]`  
+**Racional**: O padrão do OpenClaw é `dmPolicy: "pairing"` — remetentes desconhecidos recebem código de verificação e o bot não processa a mensagem. Victor enviaria mensagens mas nunca receberia resposta sem esta configuração.  
+**Segurança**: Limitar `allowFrom` ao chat ID de Victor (Art. III) é mais seguro que `dmPolicy: "open"`.
+
+### 8.7 Skills Format — AgentSkills SKILL.md
+
+**Decisão**: Cada skill precisa de pasta com `SKILL.md` no formato AgentSkills em `<workspace>/skills/<name>/SKILL.md`  
+**Racional**: O OpenClaw descobre skills via `SKILL.md` com frontmatter YAML. O arquivo de código (`index.js`) existe mas sem `SKILL.md` o agente não sabe da existência da skill.  
+**Localização correta**: `config/openclaw/workspace/skills/<skill-name>/SKILL.md` (montado em `/home/node/.openclaw/workspace/skills/`)
+
+### 8.8 Workspace Files Location — CORRIGIDO
+
+**Decisão**: `config/openclaw/workspace/{SOUL.md,USER.md,AGENTS.md}`  
+**Racional**: Arquivos de personalidade/contexto do agente pertencem ao workspace root: `/home/node/.openclaw/workspace/`. O caminho `config/openclaw/agents/jarvis/` nunca é lido pelo OpenClaw.  
+**Ação**: Mover (não copiar) os arquivos existentes para o caminho correto.
 

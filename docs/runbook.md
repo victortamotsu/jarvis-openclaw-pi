@@ -732,3 +732,212 @@ docker ps | grep openclaw-gateway  # Should show as running
 **Runbook Status**: COMPLETE (Phase 7)  
 **Last Updated**: 2026-03-04  
 **Sections**: Initial Setup, Container Management, OAuth, Operations, Backup/Recovery, WhatsApp, Diagnostics, Recovery Testing
+---
+
+## Tavily API Key Setup (T088 — MANUAL)
+
+1. Acessar https://app.tavily.com/sign-up
+2. Criar conta gratuita (plano free: 1.000 req/mês, sem cartão)
+3. Copiar API key no formato `tvly-xxxxxxxxxxxxxxxx`
+4. Adicionar ao `.env` no Pi:
+   ```bash
+   echo 'TAVILY_API_KEY=tvly-sua-chave-aqui' >> ~/jarvis-openclaw-pi/.env
+   ```
+5. Verificar que `.env.example` já contém `TAVILY_API_KEY=tvly-placeholder` como referência
+
+---
+
+## Sincronização de Config para o Pi (T092 — MANUAL)
+
+Após qualquer alteração em `openclaw.json`, `SOUL.md` ou `skills/*/SKILL.md`:
+
+```bash
+# Do Windows / máquina local:
+scp config/openclaw/openclaw.json victor@192.168.86.30:~/jarvis-openclaw-pi/config/openclaw/openclaw.json
+scp config/openclaw/workspace/SOUL.md victor@192.168.86.30:~/jarvis-openclaw-pi/config/openclaw/workspace/SOUL.md
+scp config/openclaw/workspace/skills/travel-monitor/SKILL.md victor@192.168.86.30:~/jarvis-openclaw-pi/config/openclaw/workspace/skills/travel-monitor/SKILL.md
+
+# Reiniciar container openclaw no Pi:
+ssh victor@192.168.86.30 "cd ~/jarvis-openclaw-pi && docker compose restart openclaw && sleep 30 && docker compose ps"
+```
+
+Confirmar que container aparece como `(healthy)` após restart.
+
+Alternativamente, via git:
+```bash
+git add -A && git commit -m "fix: Phase 8.2 — skills.entries + lean SOUL.md + TAVILY_API_KEY"
+git push
+ssh victor@192.168.86.30 "cd ~/jarvis-openclaw-pi && git pull && docker compose restart openclaw"
+```
+
+---
+
+## Smoke Test: Web Search (T093 — MANUAL)
+
+Após sincronização e restart do container openclaw:
+
+1. Enviar via Telegram (ao bot Jarvis):
+   ```
+   Pesquise usando tavily: cotação do dólar hoje
+   ```
+2. Resultado esperado: agente retorna dados reais (não "não há ferramenta disponível")
+3. Verificar log:
+   ```bash
+   docker logs openclaw-gateway --since 2m | grep -i "tavily\|tool"
+   ```
+   Deve mostrar chamada à tool `tavily-search`.
+
+Se retornar erro de TAVILY_API_KEY: verificar que a key foi salva no `.env` do Pi e que o container foi reiniciado.
+
+---
+
+## Troubleshooting: exec Permission Denied (T101)
+
+**Sintoma**: log recorrente `[tools] exec failed: sh: 1: pipe: Permission denied`
+
+**Diagnóstico** (executar no Pi):
+
+```bash
+# 1. Confirmar usuário em execução dentro do container
+docker exec openclaw-gateway whoami
+
+# 2. Testar se shell básico funciona
+docker exec openclaw-gateway sh -c "echo ok"
+
+# 3. Verificar permissões do volume no host
+ls -la ~/jarvis-openclaw-pi/config/openclaw/
+
+# 4. Verificar restrições de segurança (seccomp/AppArmor)
+docker inspect openclaw-gateway | grep -i "seccomp\|apparmor"
+
+# 5. Verificar se scripts têm permissão de execução
+ls -la ~/jarvis-openclaw-pi/scripts/*.sh
+```
+
+**Correções comuns**:
+- Se scripts sem `+x`: `chmod +x ~/jarvis-openclaw-pi/scripts/*.sh`
+- Se problema de seccomp: adicionar `security_opt: ["seccomp:unconfined"]` ao serviço `openclaw` no `docker-compose.yml` (revisar impacto de segurança antes)
+- Se usuário sem permissão de shell: verificar se a imagem `ghcr.io/openclaw/openclaw:latest` usa `/bin/sh` ou `/bin/bash`
+
+---
+
+## Teste E2E Skill de Viagem (T095 — MANUAL)
+
+Pré-condições: T092 (sync) + T093 (smoke test tavily) completos.
+
+Enviar via Telegram:
+```
+Pesquise passagens GRU para Orlando para junho 2026, 4 adultos, orçamento total R$12.000
+```
+
+Critérios de sucesso:
+1. Agente usa `flight-search` ou `tavily-search` (verificar nos logs)
+2. Resposta contém opções com preços reais **ou** justificativa de ausência de ofertas no orçamento
+3. **NÃO** retorna: "não há web crawler disponível" ou "não há ferramenta disponível"
+4. Logs **sem** erro `"Copilot token"` ou `"no tools found"`
+
+```bash
+# Verificar logs após o teste:
+docker logs openclaw-gateway --since 5m | grep -i "flight\|tavily\|search\|error"
+```
+
+---
+
+## Deploy em Produção — Phase 9 (T066–T075 — MANUAL no Pi)
+
+### Pré-condições
+- T076–T087: ✅ (Phase 8 concluída)
+- T088–T101: ✅ (Phase 8.2 concluída)
+
+### T068 — Criar `.env` de produção
+
+```bash
+ssh victor@192.168.86.30
+cd ~/jarvis-openclaw-pi
+cp .env.example .env
+nano .env  # Preencher todos os tokens reais
+git-crypt lock  # Criptografar .env
+```
+
+Variáveis obrigatórias: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `GITHUB_TOKEN`,
+`FIREFLY_TOKEN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`,
+`APP_KEY`, `TAVILY_API_KEY`.
+
+### T069 — Criar estrutura de diretórios
+
+```bash
+ssh victor@192.168.86.30 "bash ~/jarvis-openclaw-pi/scripts/setup-pi.sh"
+```
+
+### T070 — Iniciar containers
+
+```bash
+ssh victor@192.168.86.30 "cd ~/jarvis-openclaw-pi && docker-compose up -d && sleep 60 && docker-compose ps"
+```
+
+Confirmar 4 containers com status `(healthy)`: `firefly-iii`, `openclaw-gateway`, `mcporter-firefly`, `jarvis-scheduler`.
+
+### T071 — Parear canais
+
+- **WhatsApp**: `docker-compose logs openclaw` → QR code → escanear com WhatsApp → Dispositivos Conectados
+- **Telegram**: enviar `/start` ao bot e confirmar resposta em < 30 segundos
+
+### T072 — Verificar crontab no scheduler
+
+```bash
+ssh victor@192.168.86.30 "docker-compose -f ~/jarvis-openclaw-pi/docker-compose.yml exec scheduler crontab -l"
+```
+
+### T073 — Smoke tests E2E das 4 Skills
+
+```bash
+# Skill 1 — Pendências:
+# Enviar via Telegram: "Criar task: Testar integração Jarvis com prazo amanhã"
+# Confirmar task no Google Tasks
+
+# Skill 2 — Finanças:
+# /importar via Telegram com CSV de teste
+
+# Skill 3 — Viagens:
+# /monitorar Orlando Jun2026 4pessoas orcamento20000
+
+# Skill 4 — Programador:
+# /ideia app de rastreamento de gastos pessoais
+```
+
+### T074 — Checklist de segurança
+
+```bash
+# a) Verificar portas expostas (apenas 127.0.0.1)
+ssh victor@192.168.86.30 "docker ps --format '{{.Ports}}'"
+
+# b) Verificar git-crypt
+ssh victor@192.168.86.30 "cd ~/jarvis-openclaw-pi && git-crypt status"
+
+# c) Sem credenciais nos logs
+ssh victor@192.168.86.30 "grep -rE 'token|password|secret|Bearer' /mnt/external/logs/ 2>/dev/null | wc -l"
+# Deve retornar 0
+
+# d) Health check
+ssh victor@192.168.86.30 "bash ~/jarvis-openclaw-pi/scripts/health-check.sh"
+```
+
+### T075 — Registrar go-live
+
+Após validação, registrar em `docs/runbook.md` (seção "Deploy History"):
+```
+## Deploy History
+
+| Data | Commit | Resultado | Observações |
+|------|--------|-----------|-------------|
+| YYYY-MM-DD | <hash> | ✅ | Smoke tests OK — Phases 1–8.2 |
+```
+
+Atualizar `spec.md`: status `DRAFT` → `DEPLOYED`.
+
+Fazer commit final:
+```bash
+git add -A
+git commit -m "chore: Production deployment go-live $(date +%Y-%m-%d)"
+git push
+```

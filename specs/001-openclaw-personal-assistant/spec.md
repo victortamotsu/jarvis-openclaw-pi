@@ -9,7 +9,7 @@
 
 ## 1. Visão Geral
 
-Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando OpenClaw como plataforma, GitHub Copilot como modelo exclusivo e **Telegram como interface principal de interação** (WhatsApp apenas como canal de leitura). O assistente deve ser **custo ~zero** (sem assinaturas além do GitHub Copilot Pro já existente) e cobrir quatro domínios: gestão de pendências, finanças pessoais, viagens e prototipagem de projetos.
+Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando OpenClaw como plataforma, **GitHub Copilot Pro com modelo GPT-4.1** como LLM exclusivo (multiplier 0, sem débito de premium requests) e **Telegram como interface principal de interação** (WhatsApp apenas como canal de leitura). O assistente deve ser **custo ~zero** (sem assinaturas além do GitHub Copilot Pro já existente) e cobrir quatro domínios: gestão de pendências, finanças pessoais, viagens e prototipagem de projetos.
 
 ---
 
@@ -99,13 +99,19 @@ Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando
 **US-3.5**: Como Victor, quero poder definir condições (preço máximo, número de conexões, tipo de hospedagem, localização) para filtrar resultados.
 
 **Critérios de Aceite — Skill 3**:
+- [ ] **Pré-condição (smoke test)**: antes de qualquer teste E2E de viagem, verificar que o agente consegue invocar uma tool de busca web e retornar resultados reais — falha neste item bloqueia todos os demais da Skill 3
+- [ ] **Pré-condição (ambiente)**: `TAVILY_API_KEY` configurada no `.env` do Pi e passada ao container; confirmado via `docker logs openclaw-gateway | grep tavily`
 - [ ] Parâmetros persistentes: destinos, datas-alvo, orçamento máximo por trecho, requisitos de hospedagem
 - [ ] Monitoramento de emails promocionais com keywords de viagem
-- [ ] Pesquisa sob demanda em fontes: Google Flights (via skill), Booking, Airbnb
+- [ ] Pesquisa sob demanda em fontes: **Google Flights (via SerpAPI Google Flights engine)**, **Airbnb (via mcp-server-airbnb)**; Booking.com fora de escopo
+- [ ] `mcp-server-airbnb` iniciado com robots.txt ativo (padrão); se smoke test mostrar falha na maioria das buscas, reconfigurar com `--ignore-robots-txt` como flag permanente
+- [ ] Health check semanal automático (cron): 1 chamada SerpAPI de teste + ping Airbnb MCP; alerta Telegram disparado apenas em falha; sem exibição de resultado ao usuário; consumo máximo de ~4 chamadas SerpAPI/mês
 - [ ] Alertas via **Telegram** quando encontrar deal dentro dos parâmetros
 - [ ] Task criada no Google Tasks (via Skill 1) com detalhes da oferta e deadline para decisão
 - [ ] Comparativo de preços quando múltiplas opções existirem (tabela ou doc no Drive)
 - [ ] Checagem periódica (diária ou configurável) nos períodos próximos às datas-alvo
+- [ ] Controle de cota SerpAPI: contador persistido em `serp-usage.json`; alerta Telegram ao atingir 200/250 chamadas no mês; bloqueio com mensagem de erro amigável ao atingir 250/250
+- [ ] **Formato obrigatório de resposta de voo** (smoke test mensurável): cada opção retornada DEVE conter — airline + número do voo, `IATA_ORIGEM HH:MM → IATA_DESTINO HH:MM[+d]`, duração total (ex.: `12h45`), número de escalas, preço por pessoa em BRL (`R$ X.XXX`), preço total para todos os adultos, link Google Flights direto (`https://www.google.com/flights?...`); resposta sem qualquer desses campos é considerada falha de AC
 
 ### 3.4 Skill 4 — Agente Programador
 
@@ -159,7 +165,7 @@ Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando
 ### 4.1 Custo
 | Item | Custo Esperado |
 |------|---------------|
-| GitHub Copilot Pro | Já possui (existente) |
+| GitHub Copilot Pro (modelo **GPT-4.1**) | Já possui — multiplier 0, sem débito de premium requests |
 | Raspberry Pi 4 + storage | Já possui (existente) |
 | Google Workspace (Tasks, Gmail, Drive) | Grátis (conta pessoal) |
 | Telegram Bot | Grátis (API oficial) |
@@ -397,6 +403,14 @@ Criar um assistente pessoal de IA operando em um Raspberry Pi 4 (4GB RAM) usando
 ---
 
 ## 9. Clarificações
+
+### Sessão 2026-03-08
+
+- Q: Qual modelo de IA usar dentro do GitHub Copilot como provedor? → A: **GPT-4.1** (multiplier 0 — não debita premium requests do plano Pro; Gemini 3 Flash descartado por multiplier 0.33)
+- Q: Política de controle da cota SerpAPI (250 buscas/mês free)? → A: **Alerta Telegram em 80% (200/250) + bloqueio em 100% com mensagem de erro amigável** — contador de uso salvo em JSON local (`serp-usage.json`); agente recusa nova busca ao atingir limite e informa Victor via Telegram
+- Q: Formato obrigatório da resposta de busca de voos? → A: **Tabela completa por opção**: airline, número do voo, horário de partida (IATA origem), horário de chegada (IATA destino, +d se pernoite), duração total, número de escalas, preço por pessoa em BRL, preço total para N adultos, link Google Flights direto — todos os campos obrigatórios para o smoke test passar
+- Q: Airbnb MCP — respeitar ou ignorar robots.txt? → A: **Iniciar com robots.txt ativo (padrão); se a maioria das buscas falhar em teste real, ativar `--ignore-robots-txt` como configuração permanente** — decisão registrada após validação em smoke test da Skill 3
+- Q: Observabilidade das integrações SerpAPI + Airbnb MCP? → A: **Health check semanal silencioso** — 1 chamada SerpAPI de teste + ping Airbnb MCP por semana (~4 chamadas SerpAPI/mês); alerta Telegram enviado apenas em caso de falha; nenhum resultado exibido ao usuário em execuções normais
 
 ### Sessão 2026-03-03
 

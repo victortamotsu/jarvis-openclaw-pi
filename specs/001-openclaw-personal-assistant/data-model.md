@@ -169,7 +169,19 @@ TravelSearch {
 }
 ```
 
-### 3.2 Destination
+### 3.2 DealSource (enum)
+
+```
+DealSource:
+  SERP_GOOGLE_FLIGHTS   # SerpAPI engine=google_flights (voos estruturados)
+  AIRBNB_MCP            # mcp-server-airbnb via airbnb_search
+  MANUAL                # Inserido diretamente pelo usuário
+  # Removido: BOOKING_COM (sem API gratuita; fora de escopo)
+```
+
+---
+
+### 3.3 Destination
 
 ```
 Destination {
@@ -180,7 +192,7 @@ Destination {
 }
 ```
 
-### 3.3 TravelDeal (Oferta Encontrada)
+### 3.4 TravelDeal (Oferta Encontrada)
 
 ```
 TravelDeal {
@@ -190,7 +202,7 @@ TravelDeal {
   destination:     string
   price_total:     decimal       # Preço total para todos os viajantes
   price_per_person: decimal
-  source:          string        # "Google Flights", "Booking.com"
+  source:          DealSource    # Ver enum abaixo
   url:             string        # Link direto
   details:         string        # Detalhes formatados
   valid_until:     datetime?     # Validade da oferta
@@ -199,6 +211,27 @@ TravelDeal {
   status:          DealStatus    # FOUND | NOTIFIED | ANALYZING | BOOKED | EXPIRED
 }
 ```
+
+### 3.5 SerpAPIUsage (Controle de Cota)
+
+> Persistido em `/mnt/external/openclaw/memory/serp-usage.json`
+
+```
+SerpAPIUsage {
+  month:           string      # "YYYY-MM" (ex: "2026-03") — chave de reset
+  calls_used:      int         # Chamadas consumidas no mês corrente
+  calls_limit:     int         # 250 (free tier SerpAPI)
+  last_call:       datetime?   # Timestamp da última chamada faturada
+  alert_80_sent:   boolean     # true após enviar alerta Telegram de 80%
+  blocked:         boolean     # true quando calls_used >= calls_limit
+}
+```
+
+**Invariantes**:
+- Cached searches (`search_metadata.cached = true`) NÃO incrementam `calls_used`
+- Reset: quando `month != currentMonth` → zerar `calls_used`, `alert_80_sent`, `blocked`
+- Alerta Telegram enviado **uma única vez** por mês (controlado por `alert_80_sent`)
+- Quando `blocked = true`: qualquer tentativa de SerpAPI retorna erro amigável sem chamada HTTP
 
 ---
 

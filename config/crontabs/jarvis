@@ -48,6 +48,10 @@
 # (Checks active searches in travel-params.json, alerts if deals found)
 0 7 * * * docker-compose -f /home/pi/jarvis-openclaw-pi/docker-compose.yml exec -T openclaw openclaw agent --message "Verificar deals de viagem para buscas ativas em travel-params.json. Alertar se encontrar dentro do orçamento com tabela comparativa se >=2 resultados. Criar task em Google Tasks para cada deal com deadline 48h." --max-tokens 2000 >> /mnt/external/logs/openclaw/travel-deals.log 2>&1
 
+# T109: Weekly SerpAPI + Airbnb health check (Sunday 08:00) — ~4 SerpAPI calls/month
+# Silent on success; alerts Victor via Telegram ONLY on failure
+0 8 * * 0 docker-compose -f /home/pi/jarvis-openclaw-pi/docker-compose.yml exec -T openclaw openclaw agent --message "Health check semanal: executar 1 busca SerpAPI de teste (GRU→GIG próxima semana) + verificar mcp-airbnb responsivo. Alertar Victor via Telegram APENAS se algum falhar. Não exibir resultado ao usuário em caso de sucesso." --max-tokens 300 >> /mnt/external/logs/openclaw/health-check-travel.log 2>&1
+
 # ─────────────────────────────────────────────────────────────────────
 # System Maintenance (Phase 7: Logging & Operations)
 # ─────────────────────────────────────────────────────────────────────

@@ -1,0 +1,8 @@
+{
+  "month": "",
+  "calls_used": 0,
+  "calls_limit": 250,
+  "last_call": null,
+  "alert_80_sent": false,
+  "blocked": false
+}
