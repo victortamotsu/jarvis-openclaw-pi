@@ -5,7 +5,7 @@ metadata:
   openclaw:
     emoji: "✈️"
     requires:
-      bins: ["curl", "jq"]
+      bins: ["curl", "python3"]
       env: ["SERP_API_KEY"]
 ---
 
@@ -34,20 +34,33 @@ Pesquisa de passagens aéreas via **SerpAPI `engine=google_flights`** — retorn
 USAGE_FILE="/mnt/external/openclaw/memory/serp-usage.json"
 CURRENT_MONTH=$(date +%Y-%m)
 
-# Reset automático se virou o mês
-USAGE_MONTH=$(jq -r '.month' "$USAGE_FILE" 2>/dev/null || echo "")
-if [ "$USAGE_MONTH" != "$CURRENT_MONTH" ]; then
-  jq --arg m "$CURRENT_MONTH" \
-    '.month=$m | .calls_used=0 | .alert_80_sent=false | .blocked=false | .last_call=null' \
-    "$USAGE_FILE" > /tmp/serp-usage-new.json && mv /tmp/serp-usage-new.json "$USAGE_FILE"
-fi
+# Verificar / resetar cota e checar bloqueio (python3 — sem jq)
+QUOTA_STATUS=$(python3 - << 'PYEOF'
+import json, sys
+from datetime import datetime
+f = "/mnt/external/openclaw/memory/serp-usage.json"
+try:
+    with open(f) as fp:
+        d = json.load(fp)
+except Exception:
+    d = {"month": "", "calls_used": 0, "calls_limit": 250, "alert_80_sent": False, "blocked": False, "last_call": None}
+cm = datetime.now().strftime("%Y-%m")
+if d.get("month", "") != cm:
+    d.update({"month": cm, "calls_used": 0, "alert_80_sent": False, "blocked": False, "last_call": None})
+    with open(f, "w") as fp:
+        json.dump(d, fp, indent=2)
+used = int(d.get("calls_used", 0))
+limit = int(d.get("calls_limit", 250))
+if d.get("blocked", False) or used >= limit:
+    print(f"BLOCKED:{used}")
+else:
+    print(f"OK:{used}")
+PYEOF
+)
 
-# Verificar bloqueio
-BLOCKED=$(jq -r '.blocked' "$USAGE_FILE" 2>/dev/null || echo "false")
-CALLS_USED=$(jq -r '.calls_used' "$USAGE_FILE" 2>/dev/null || echo "0")
-
-if [ "$BLOCKED" = "true" ]; then
-  NEXT_MONTH=$(date -d "$(date +%Y-%m-01) +1 month" +%B 2>/dev/null || echo "próximo mês")
+if echo "$QUOTA_STATUS" | grep -q "^BLOCKED"; then
+  CALLS_USED=$(echo "$QUOTA_STATUS" | cut -d: -f2)
+  NEXT_MONTH=$(python3 -c "import datetime; d=datetime.date.today(); nm=datetime.date(d.year+(1 if d.month==12 else 0),d.month%12+1,1); print(nm.strftime('%B %Y'))" 2>/dev/null || echo "próximo mês")
   echo "⛔ Cota SerpAPI esgotada (${CALLS_USED}/250). Buscas de voo desativadas até 1º de ${NEXT_MONTH}."
   exit 1
 fi
@@ -89,9 +102,20 @@ Extrair e formatar para cada opção em `best_flights[]`:
 
 ```bash
 # Incrementar cota somente se não é cached
-CACHED=$(echo "$RESPONSE" | jq -r '.search_metadata.cached // false')
+CACHED=$(echo "$RESPONSE" | python3 -c "import json,sys; d=json.load(sys.stdin); print(str(d.get('search_metadata',{}).get('cached',False)).lower())" 2>/dev/null || echo "false")
 if [ "$CACHED" = "false" ]; then
-  bash /home/pi/jarvis-openclaw-pi/scripts/serp-quota.sh --increment
+  python3 - << 'PYEOF'
+import json, sys
+from datetime import datetime
+f = "/mnt/external/openclaw/memory/serp-usage.json"
+with open(f) as fp:
+    d = json.load(fp)
+d["calls_used"] = d.get("calls_used", 0) + 1
+d["last_call"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+with open(f, "w") as fp:
+    json.dump(d, fp, indent=2)
+print(f"[serp-quota] Incrementado: {d['calls_used']}/{d.get('calls_limit', 250)}", file=sys.stderr)
+PYEOF
 fi
 
 # Parsear e formatar resultado

@@ -42,23 +42,39 @@ if [ ! -f "$SERP_USAGE_FILE" ]; then
 fi
 
 # ─────────────────────────────────────────────────────────────────────
-# Load current values
+# Load current values (python3 — jq not required)
 # ─────────────────────────────────────────────────────────────────────
-USAGE_MONTH=$(jq -r '.month // ""' "$SERP_USAGE_FILE")
-CALLS_USED=$(jq -r '.calls_used // 0' "$SERP_USAGE_FILE")
-CALLS_LIMIT=$(jq -r '.calls_limit // 250' "$SERP_USAGE_FILE")
-ALERT_SENT=$(jq -r '.alert_80_sent // false' "$SERP_USAGE_FILE")
-BLOCKED=$(jq -r '.blocked // false' "$SERP_USAGE_FILE")
+read -r USAGE_MONTH CALLS_USED CALLS_LIMIT ALERT_SENT BLOCKED <<< "$(python3 - << 'PYEOF'
+import json, sys
+f = "$SERP_USAGE_FILE"
+try:
+    with open(f) as fp:
+        d = json.load(fp)
+except Exception:
+    d = {}
+print(
+    d.get("month", ""),
+    int(d.get("calls_used", 0)),
+    int(d.get("calls_limit", 250)),
+    str(d.get("alert_80_sent", False)).lower(),
+    str(d.get("blocked", False)).lower()
+)
+PYEOF
+)"
 
 # ─────────────────────────────────────────────────────────────────────
 # Monthly reset — new month detected
 # ─────────────────────────────────────────────────────────────────────
 if [ "$USAGE_MONTH" != "$CURRENT_MONTH" ]; then
-    jq \
-        --arg m "$CURRENT_MONTH" \
-        '.month=$m | .calls_used=0 | .alert_80_sent=false | .blocked=false | .last_call=null' \
-        "$SERP_USAGE_FILE" > "${SERP_USAGE_FILE}.tmp" \
-        && mv "${SERP_USAGE_FILE}.tmp" "$SERP_USAGE_FILE"
+    python3 - << PYEOF
+import json
+f = "${SERP_USAGE_FILE}"
+with open(f) as fp:
+    d = json.load(fp)
+d.update({"month": "${CURRENT_MONTH}", "calls_used": 0, "alert_80_sent": False, "blocked": False, "last_call": None})
+with open(f, "w") as fp:
+    json.dump(d, fp, indent=2)
+PYEOF
     CALLS_USED=0
     ALERT_SENT="false"
     BLOCKED="false"
@@ -79,8 +95,13 @@ case "$MODE" in
     fi
     if [ "$CALLS_USED" -ge "$CALLS_LIMIT" ]; then
         # Update blocked flag if not already set
-        jq '.blocked=true' "$SERP_USAGE_FILE" > "${SERP_USAGE_FILE}.tmp" \
-            && mv "${SERP_USAGE_FILE}.tmp" "$SERP_USAGE_FILE"
+        python3 -c "
+import json
+f='${SERP_USAGE_FILE}'
+with open(f) as fp: d=json.load(fp)
+d['blocked']=True
+with open(f,'w') as fp: json.dump(d,fp,indent=2)
+"
         echo "[serp-quota] BLOCKED: quota reached (${CALLS_USED}/${CALLS_LIMIT})." >&2
         exit 1
     fi
@@ -92,12 +113,17 @@ case "$MODE" in
     NEW_COUNT=$((CALLS_USED + 1))
 
     # Persist increment + last_call timestamp
-    jq \
-        --argjson c "$NEW_COUNT" \
-        --arg t "$NOW" \
-        '.calls_used=$c | .last_call=$t' \
-        "$SERP_USAGE_FILE" > "${SERP_USAGE_FILE}.tmp" \
-        && mv "${SERP_USAGE_FILE}.tmp" "$SERP_USAGE_FILE"
+    python3 - << PYEOF
+import json
+from datetime import datetime
+f = "${SERP_USAGE_FILE}"
+with open(f) as fp:
+    d = json.load(fp)
+d["calls_used"] = ${NEW_COUNT}
+d["last_call"] = "${NOW}"
+with open(f, "w") as fp:
+    json.dump(d, fp, indent=2)
+PYEOF
 
     echo "[serp-quota] Incremented: ${NEW_COUNT}/${CALLS_LIMIT}" >&2
 
@@ -107,15 +133,25 @@ case "$MODE" in
         REMAINING=$((CALLS_LIMIT - NEW_COUNT))
         MSG="⚠️ <b>SerpAPI Alerta de Cota</b>%0A${NEW_COUNT}/${CALLS_LIMIT} chamadas usadas este mês (${REMAINING} restantes).%0ABuscas de voo continuam disponíveis — monitore o uso."
         send_telegram "$MSG"
-        jq '.alert_80_sent=true' "$SERP_USAGE_FILE" > "${SERP_USAGE_FILE}.tmp" \
-            && mv "${SERP_USAGE_FILE}.tmp" "$SERP_USAGE_FILE"
+        python3 -c "
+import json
+f='${SERP_USAGE_FILE}'
+with open(f) as fp: d=json.load(fp)
+d['alert_80_sent']=True
+with open(f,'w') as fp: json.dump(d,fp,indent=2)
+"
         echo "[serp-quota] 80% alert sent (${NEW_COUNT}/${CALLS_LIMIT})" >&2
     fi
 
     # 100% block (250/250)
     if [ "$NEW_COUNT" -ge "$CALLS_LIMIT" ]; then
-        jq '.blocked=true' "$SERP_USAGE_FILE" > "${SERP_USAGE_FILE}.tmp" \
-            && mv "${SERP_USAGE_FILE}.tmp" "$SERP_USAGE_FILE"
+        python3 -c "
+import json
+f='${SERP_USAGE_FILE}'
+with open(f) as fp: d=json.load(fp)
+d['blocked']=True
+with open(f,'w') as fp: json.dump(d,fp,indent=2)
+"
         NEXT_MONTH=$(date -d "$(date +%Y-%m-01) +1 month" +%Y-%m 2>/dev/null \
             || python3 -c "import datetime; d=datetime.date.today(); print(f'{d.year}-{d.month%12+1:02d}' if d.month<12 else f'{d.year+1}-01')")
         MSG="🛑 <b>SerpAPI Cota Esgotada</b>%0ABuscas de voo desativadas até 1º de ${NEXT_MONTH}.%0AChamadas restantes este mês: 0/${CALLS_LIMIT}."
@@ -129,7 +165,7 @@ case "$MODE" in
 
   --status)
     REMAINING=$((CALLS_LIMIT - CALLS_USED))
-    LAST_CALL=$(jq -r '.last_call // "nunca"' "$SERP_USAGE_FILE")
+    LAST_CALL=$(python3 -c "import json; d=json.load(open('${SERP_USAGE_FILE}')); print(d.get('last_call') or 'nunca')")
     echo "SerpAPI Quota — ${CURRENT_MONTH}"
     echo "  Usadas:     ${CALLS_USED}/${CALLS_LIMIT}"
     echo "  Restantes:  ${REMAINING}"
