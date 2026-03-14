@@ -5,7 +5,7 @@
   agents: {
     defaults: {
       model: {
-        primary: "github-copilot/gpt-4.1", // multiplier 0 — sem débito de premium requests
+        primary: "github-copilot/gpt-4o",
       },
       workspace: "/home/node/.openclaw/workspace",
     },
