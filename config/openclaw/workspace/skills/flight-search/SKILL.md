@@ -1,6 +1,6 @@
 ---
 name: flight-search
-description: "Pesquisa passagens aéreas via SerpAPI Google Flights (dados estruturados). Use quando Victor pedir cotação de voos, passagens, comparar preços ou monitorar deals. Retorna 8 campos obrigatórios por opção."
+description: "Pesquisa passagens aéreas via SerpAPI Google Flights (dados estruturados). Use quando Victor pedir cotação de voos, passagens, comparar preços ou monitorar deals. Retorna preço, companhia, horários, duração, escalas e link direto."
 metadata:
   openclaw:
     emoji: "✈️"
@@ -11,199 +11,156 @@ metadata:
 
 # flight-search Skill
 
-Pesquisa de passagens aéreas via **SerpAPI `engine=google_flights`** — retorna dados estruturados JSON com preços, horários, escalas e link direto ao Google Flights.
-
-> Substituiu Tavily flight search (2026-03-08): Tavily retornava links genéricos sem dados estruturados.
+Pesquisa de passagens aéreas via **SerpAPI `engine=google_flights`** — dados estruturados com preços, horários, escalas e link direto ao Google Flights.
 
 ## Quando Usar
 
-- Victor pede cotação de voos (origem/destino/data)
-- Monitoramento diário de deals (cron 07:00)
-- Comparação de companhias aéreas
+- Victor pede cotação de voos, passagens aéreas ou comparação de preços
+- Monitoramento de deals (cron 07:00)
 
 ## Quando NÃO Usar
 
-- Reserva/compra direta → redirecionar para `search_metadata.google_flights_url`
-- Cota SerpAPI esgotada (`blocked=true` em `serp-usage.json`) → retornar mensagem de erro
+- Reserva/compra direta → redirecionar para o link do Google Flights retornado
+- Hospedagem → usar `airbnb` skill
 
-## Pré-condição: Verificar Cota SerpAPI
+## Aeroportos Padrão do Victor
 
-**SEMPRE** verificar `serp-usage.json` ANTES de qualquer chamada HTTP:
+| Origem padrão | `GRU` | Guarulhos, São Paulo |
+|---------------|-------|----------------------|
+| Moeda | `BRL` | Real brasileiro |
+| Adultos padrão | `1` | Ajustar conforme pedido |
+
+## Comandos
+
+**REGRA**: Execute o script abaixo EXATAMENTE como está. Substitua apenas as variáveis no topo (ORIGIN, DEST, DATE_OUT, DATE_RET, ADULTS). NÃO reescreva o bloco Python.
+
+### Busca Ida e Volta
 
 ```bash
-USAGE_FILE="/mnt/external/openclaw/memory/serp-usage.json"
-CURRENT_MONTH=$(date +%Y-%m)
+ORIGIN="GRU"
+DEST="FCO"
+DATE_OUT="2026-09-05"
+DATE_RET="2026-09-20"
+ADULTS=1
 
-# Verificar / resetar cota e checar bloqueio (python3 — sem jq)
-QUOTA_STATUS=$(python3 - << 'PYEOF'
+RESPONSE=$(curl -fsS "https://serpapi.com/search.json?engine=google_flights&departure_id=${ORIGIN}&arrival_id=${DEST}&outbound_date=${DATE_OUT}&return_date=${DATE_RET}&adults=${ADULTS}&currency=BRL&hl=pt&type=1&api_key=${SERP_API_KEY}") && echo "$RESPONSE" | python3 - << 'PYEOF'
 import json, sys
-from datetime import datetime
+from datetime import datetime, timezone
+
+data = json.load(sys.stdin)
+err = data.get("error")
+if err:
+    print(f"❌ SerpAPI erro: {err}")
+    sys.exit(1)
+
+flights = data.get("best_flights", []) + data.get("other_flights", [])
+link = data.get("search_metadata", {}).get("google_flights_url", "https://www.google.com/flights")
+
 f = "/mnt/external/openclaw/memory/serp-usage.json"
 try:
     with open(f) as fp:
-        d = json.load(fp)
-except Exception:
-    d = {"month": "", "calls_used": 0, "calls_limit": 250, "alert_80_sent": False, "blocked": False, "last_call": None}
-cm = datetime.now().strftime("%Y-%m")
-if d.get("month", "") != cm:
-    d.update({"month": cm, "calls_used": 0, "alert_80_sent": False, "blocked": False, "last_call": None})
+        usage = json.load(fp)
+    cm = datetime.now().strftime("%Y-%m")
+    if usage.get("month", "") != cm:
+        usage.update({"month": cm, "calls_used": 0, "alert_80_sent": False, "blocked": False, "last_call": None})
+    cached = data.get("search_metadata", {}).get("cached", False)
+    if not cached:
+        usage["calls_used"] = usage.get("calls_used", 0) + 1
+        usage["last_call"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     with open(f, "w") as fp:
-        json.dump(d, fp, indent=2)
-used = int(d.get("calls_used", 0))
-limit = int(d.get("calls_limit", 250))
-if d.get("blocked", False) or used >= limit:
-    print(f"BLOCKED:{used}")
-else:
-    print(f"OK:{used}")
-PYEOF
-)
-
-if echo "$QUOTA_STATUS" | grep -q "^BLOCKED"; then
-  CALLS_USED=$(echo "$QUOTA_STATUS" | cut -d: -f2)
-  NEXT_MONTH=$(python3 -c "import datetime; d=datetime.date.today(); nm=datetime.date(d.year+(1 if d.month==12 else 0),d.month%12+1,1); print(nm.strftime('%B %Y'))" 2>/dev/null || echo "próximo mês")
-  echo "⛔ Cota SerpAPI esgotada (${CALLS_USED}/250). Buscas de voo desativadas até 1º de ${NEXT_MONTH}."
-  exit 1
-fi
-```
-
-## Busca de Voos (SerpAPI Google Flights)
-
-```bash
-# Parâmetros obrigatórios
-ORIGIN="GRU"        # IATA do aeroporto de origem
-DEST="MCO"          # IATA do aeroporto de destino
-DATE_OUT="2026-07-01"  # YYYY-MM-DD
-DATE_RET="2026-07-15"  # YYYY-MM-DD (omitir para só-ida, type=2)
-ADULTS=4
-CURRENCY="BRL"
-
-# Chamada SerpAPI Google Flights
-RESPONSE=$(curl -fsS \
-  "https://serpapi.com/search.json?engine=google_flights\
-&departure_id=${ORIGIN}\
-&arrival_id=${DEST}\
-&outbound_date=${DATE_OUT}\
-&return_date=${DATE_RET}\
-&adults=${ADULTS}\
-&currency=${CURRENCY}\
-&hl=pt\
-&type=1\
-&api_key=${SERP_API_KEY}" 2>&1)
-
-if [ $? -ne 0 ]; then
-  echo "✗ Erro ao consultar SerpAPI. Verifique SERP_API_KEY."
-  exit 1
-fi
-```
-
-## Formato Obrigatório de Resposta (8 campos — AC Skill 3)
-
-Extrair e formatar para cada opção em `best_flights[]`:
-
-```bash
-# Incrementar cota somente se não é cached
-CACHED=$(echo "$RESPONSE" | python3 -c "import json,sys; d=json.load(sys.stdin); print(str(d.get('search_metadata',{}).get('cached',False)).lower())" 2>/dev/null || echo "false")
-if [ "$CACHED" = "false" ]; then
-  python3 - << 'PYEOF'
-import json, sys
-from datetime import datetime
-f = "/mnt/external/openclaw/memory/serp-usage.json"
-with open(f) as fp:
-    d = json.load(fp)
-d["calls_used"] = d.get("calls_used", 0) + 1
-d["last_call"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-with open(f, "w") as fp:
-    json.dump(d, fp, indent=2)
-print(f"[serp-quota] Incrementado: {d['calls_used']}/{d.get('calls_limit', 250)}", file=sys.stderr)
-PYEOF
-fi
-
-# Parsear e formatar resultado
-echo "$RESPONSE" | python3 - << 'EOF'
-import json, sys, re
-
-data = json.loads(sys.stdin.read())
-flights = data.get("best_flights", []) + data.get("other_flights", [])
-link = data.get("search_metadata", {}).get("google_flights_url", "")
+        json.dump(usage, fp, indent=2)
+    used = usage["calls_used"]
+    limit = usage.get("calls_limit", 250)
+except Exception:
+    used, limit = "?", 250
 
 if not flights:
-    print("❌ Nenhum voo encontrado para os parâmetros informados.")
+    print("❌ Nenhum voo encontrado. Tente outras datas ou verifique os códigos IATA.")
     sys.exit(0)
 
+print(f"✈️  Voos encontrados ({used}/{limit} créditos SerpAPI usados este mês)\n")
 for i, opt in enumerate(flights[:3], 1):
     legs = opt.get("flights", [])
     if not legs:
         continue
-
-    first = legs[0]
-    last = legs[-1]
+    first, last = legs[0], legs[-1]
     airline = first.get("airline", "?")
-    flight_num = first.get("flight_number", "")
     dep_iata = first.get("departure_airport", {}).get("id", "?")
-    dep_time = first.get("departure_airport", {}).get("time", "?")[-5:]  # HH:MM
+    dep_time = (first.get("departure_airport", {}).get("time") or "")[-5:]
     arr_iata = last.get("arrival_airport", {}).get("id", "?")
-    arr_time = last.get("arrival_airport", {}).get("time", "?")
-
-    # Calcular +d (pernoite)
-    dep_date = first.get("departure_airport", {}).get("time", "")[:10]
-    arr_date = last.get("arrival_airport", {}).get("time", "")[:10]
-    overnight = f"+{(len(arr_date) and len(dep_date) and (arr_date > dep_date) and 1 or 0)}" if arr_date > dep_date else ""
-    arr_time_fmt = arr_time[-5:] + overnight
-
+    arr_time_raw = last.get("arrival_airport", {}).get("time") or ""
+    arr_time = arr_time_raw[-5:]
+    overnight = "+1" if arr_time_raw[:10] > (first.get("departure_airport", {}).get("time") or "")[:10] else ""
     total_min = opt.get("total_duration", 0)
     duration = f"{total_min // 60}h{total_min % 60:02d}" if total_min else "?"
     stops = len(opt.get("layovers", []))
     stop_label = "direto" if stops == 0 else f"{stops} escala(s)"
-    price_pp = opt.get("price", 0)
-    adults = int(data.get("search_parameters", {}).get("adults", 1))
-    total = price_pp * adults
-
-    print(f"\n✈️  Opção {i}: {airline} {flight_num}")
-    print(f"   {dep_iata} {dep_time} → {arr_iata} {arr_time_fmt} | {duration} | {stop_label}")
-    print(f"   💰 R$ {price_pp:,.0f}/pessoa | R$ {total:,.0f} total ({adults} adultos)")
-    print(f"   🔗 {link}")
-EOF
+    price = opt.get("price", 0)
+    adults_n = int(data.get("search_parameters", {}).get("adults", 1))
+    total = price * adults_n
+    print(f"✈️  Opção {i} — {airline}")
+    print(f"   {dep_iata} {dep_time} → {arr_iata} {arr_time}{overnight} | {duration} | {stop_label}")
+    print(f"   💰 R$ {price:,.0f}/pessoa | R$ {total:,.0f} total ({adults_n} adulto(s))")
+    print(f"   🔗 {link}\n")
+PYEOF
 ```
 
-## Regras de Comportamento
-
-1. **Cota primeiro**: Verificar `serp-usage.json` antes de qualquer chamada HTTP — sem exceções
-2. **Cached = grátis**: Se `search_metadata.cached=true`, não incrementar `calls_used`
-3. **Máximo 3 opções**: Retornar `best_flights[0..2]` — não sobrecarregar a resposta
-4. **Link obrigatório**: Sempre incluir `search_metadata.google_flights_url`
-5. **Fallback**: Se SerpAPI indisponível (HTTP 5xx), informar Victor e sugerir acesso manual ao Google Flights
-6. **Booking.com**: Fora de escopo — não pesquisar hospedagem nesta skill (usar airbnb skill)
-```
-
-### Alerta de Promoção (uso pelo scheduler)
+### Busca Só-Ida
 
 ```bash
-BUDGET_BRL=5000
 ORIGIN="GRU"
-DEST="Lisboa"
+DEST="FCO"
+DATE_OUT="2026-09-05"
+ADULTS=1
 
-curl -s -X POST https://api.tavily.com/search \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer ${TAVILY_API_KEY}" \
-  -d "{\"query\": \"passagem ${ORIGIN} ${DEST} abaixo R$ ${BUDGET_BRL} promoção hoje\", \"search_depth\": \"basic\", \"max_results\": 5, \"include_answer\": true}" \
-  | python3 -c "import json,sys; d=json.load(sys.stdin); ans=d.get('answer',''); results=d.get('results',[]); print('RESUMO: '+ans); [print(str(n+1)+'. '+r.get('title','')+' — '+r.get('url','')) for n,r in enumerate(results[:5])]"
+RESPONSE=$(curl -fsS "https://serpapi.com/search.json?engine=google_flights&departure_id=${ORIGIN}&arrival_id=${DEST}&outbound_date=${DATE_OUT}&adults=${ADULTS}&currency=BRL&hl=pt&type=2&api_key=${SERP_API_KEY}") && echo "$RESPONSE" | python3 - << 'PYEOF'
+import json, sys
+data = json.load(sys.stdin)
+err = data.get("error")
+if err:
+    print(f"❌ SerpAPI erro: {err}"); sys.exit(1)
+flights = data.get("best_flights", []) + data.get("other_flights", [])
+link = data.get("search_metadata", {}).get("google_flights_url", "https://www.google.com/flights")
+for i, opt in enumerate(flights[:3], 1):
+    legs = opt.get("flights", [])
+    if not legs: continue
+    first, last = legs[0], legs[-1]
+    total_min = opt.get("total_duration", 0)
+    duration = f"{total_min // 60}h{total_min % 60:02d}" if total_min else "?"
+    stops = len(opt.get("layovers", []))
+    print(f"✈️  Opção {i} — {first.get('airline','?')}")
+    print(f"   {first['departure_airport']['id']} → {last['arrival_airport']['id']} | {duration} | {'direto' if stops==0 else str(stops)+' escala(s)'}")
+    print(f"   💰 R$ {opt.get('price',0):,.0f}\n   🔗 {link}\n")
+PYEOF
 ```
 
-## Parâmetros de Viagem do Victor
+## Resposta Esperada (exemplo)
 
-Os parâmetros salvos estão em:
 ```
-/home/node/.openclaw/workspace/memory/travel-params.json
+✈️  Voos encontrados (2/250 créditos SerpAPI usados este mês)
+
+✈️  Opção 1 — LATAM Airlines
+   GRU 23:20 → FCO 14:35+1 | 13h15 | 1 escala(s)
+   💰 R$ 4.820/pessoa | R$ 4.820 total (1 adulto(s))
+   🔗 https://www.google.com/flights?...
 ```
 
-Sempre verificar esses parâmetros antes de apresentar resultados ao usuário.
+## Códigos IATA Comuns
 
-## Limitações
-
-- Os preços retornados são estimativas extraídas de texto web — podem desatualizar rapidamente
-- Para preços exatos, direcionar o Victor ao link do site de compra
-- Datas de voo precisam ser especificadas pelo Victor (não inferir)
+| Cidade | Código |
+|--------|--------|
+| São Paulo (Guarulhos) | GRU |
+| Roma | FCO |
+| Paris | CDG |
+| Lisboa | LIS |
+| Milão | MXP |
+| Madrid | MAD |
+| Miami | MIA |
+| Orlando | MCO |
+| Nova York | JFK |
+| Tokyo | NRT |
 
 ## Notas de Segurança
 
-- Nunca exibir `TAVILY_API_KEY` na saída
+- Nunca exibir `SERP_API_KEY` na saída
+- Cota: 250 buscas/mês gratuitas — o script registra o consumo automaticamente em `/mnt/external/openclaw/memory/serp-usage.json`
