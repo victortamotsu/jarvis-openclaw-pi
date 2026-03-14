@@ -1,6 +1,6 @@
 // openclaw.json — Jarvis Personal Assistant
 // Schema: OpenClaw JSON5 (strict validation — only known keys allowed)
-// Last updated: 2026-03-08 — Phase 8.2 (T090): added skills.entries with 6 skills + TAVILY_API_KEY
+// Last updated: 2026-03-14 — Phase 10 (T103): model gpt-4.1, SERP_API_KEY, airbnb skill
 {
   agents: {
     defaults: {
@@ -10,11 +10,20 @@
       workspace: "/home/node/.openclaw/workspace",
     },
   },
+  commands: {
+    native: "auto",
+    nativeSkills: "auto",
+    restart: true,
+    ownerDisplay: "raw",
+  },
   channels: {
     telegram: {
+      enabled: true,
+      dmPolicy: "pairing",
       botToken: "${TELEGRAM_BOT_TOKEN}",
-      // allowFrom: sem isso o bot responde com codigo de pareamento (dmPolicy: pairing)
       allowFrom: ["${TELEGRAM_CHAT_ID}"],
+      groupPolicy: "allowlist",
+      streaming: "partial",
     },
   },
   skills: {
@@ -30,6 +39,9 @@
         env: {
           SERP_API_KEY: "${SERP_API_KEY}",
         },
+      },
+      "airbnb": {
+        enabled: true,
       },
       "google-tasks": {
         enabled: true,
@@ -57,14 +69,3 @@
       },
     },
   },
-  // MCP servers started as stdio child processes by OpenClaw Gateway
-  mcp_servers: [
-    {
-      name: "airbnb",
-      command: "npx",
-      args: ["-y", "@openbnb/mcp-server-airbnb"],
-      // robots.txt compliance active by default (no --ignore-robots-txt)
-      // If smoke test shows majority of searches fail, add: args: ["-y", "@openbnb/mcp-server-airbnb", "--ignore-robots-txt"]
-    },
-  ],
-}
